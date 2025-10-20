@@ -148,6 +148,7 @@ module LSP
   struct TextDocumentPositionParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
     property position : Position
   end
@@ -156,6 +157,7 @@ module LSP
   struct DidOpenTextDocumentParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentItem
   end
 
@@ -163,7 +165,9 @@ module LSP
   struct DidChangeTextDocumentParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : VersionedTextDocumentIdentifier
+    @[JSON::Field(key: "contentChanges")]
     property content_changes : Array(TextDocumentContentChangeEvent)
   end
 
@@ -171,6 +175,7 @@ module LSP
   struct DidCloseTextDocumentParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
   end
 
@@ -178,6 +183,7 @@ module LSP
   struct DidSaveTextDocumentParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
     property text : String?
   end
@@ -197,8 +203,10 @@ module LSP
   struct RenameParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
     property position : Position
+    @[JSON::Field(key: "newName")]
     property new_name : String
   end
 
@@ -206,6 +214,7 @@ module LSP
   struct ReferenceParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
     property position : Position
     property context : ReferenceContext
@@ -221,6 +230,7 @@ module LSP
   struct DocumentSymbolParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
   end
 
@@ -235,6 +245,7 @@ module LSP
   struct CompletionParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
     property position : Position
     property? context : CompletionContext?
@@ -251,6 +262,7 @@ module LSP
   struct SignatureHelpParams
     include JSON::Serializable
 
+    @[JSON::Field(key: "textDocument")]
     property text_document : TextDocumentIdentifier
     property position : Position
   end

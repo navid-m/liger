@@ -83,6 +83,7 @@ module LSP
     include JSON::Serializable
 
     property range : Range
+    @[JSON::Field(key: "newText")]
     property new_text : String
 
     def initialize(@range : Range, @new_text : String)
@@ -134,6 +135,7 @@ module LSP
     include JSON::Serializable
 
     property uri : DocumentUri
+    @[JSON::Field(key: "languageId")]
     property language_id : String
     property version : Int32
     property text : String
@@ -181,12 +183,19 @@ module LSP
     property documentation : String?
     property? deprecated : Bool?
     property? preselect : Bool?
+    @[JSON::Field(key: "sortText")]
     property sort_text : String?
+    @[JSON::Field(key: "filterText")]
     property filter_text : String?
+    @[JSON::Field(key: "insertText")]
     property insert_text : String?
+    @[JSON::Field(key: "insertTextFormat")]
     property? insert_text_format : Int32?
+    @[JSON::Field(key: "textEdit")]
     property? text_edit : TextEdit?
+    @[JSON::Field(key: "additionalTextEdits")]
     property? additional_text_edits : Array(TextEdit)?
+    @[JSON::Field(key: "commitCharacters")]
     property? commit_characters : Array(String)?
     property? data : JSON::Any?
 
@@ -244,6 +253,7 @@ module LSP
     property kind : SymbolKind
     property? deprecated : Bool?
     property range : Range
+    @[JSON::Field(key: "selectionRange")]
     property selection_range : Range
     property? children : Array(DocumentSymbol)?
 

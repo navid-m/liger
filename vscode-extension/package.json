@@ -118,6 +118,11 @@
         "command": "liger.showOutputChannel",
         "title": "Show Liger Output",
         "category": "Liger"
+      },
+      {
+        "command": "liger.showDiagnostics",
+        "title": "Show Diagnostics Info",
+        "category": "Liger"
       }
     ]
   },

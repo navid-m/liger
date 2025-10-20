@@ -56,21 +56,25 @@ module LSP
         @semantic_analyzer.workspace_root = root_uri
       end
 
-      capabilities = ServerCapabilities.new
-      capabilities.text_document_sync = 1 
-      capabilities.hover_provider = true
-      capabilities.completion_provider = CompletionOptions.new(
-        trigger_characters: [".", ":", "@"],
-        resolve_provider: false
-      )
-      capabilities.signature_help_provider = SignatureHelpOptions.new(
-        trigger_characters: ["(", ","]
-      )
-      capabilities.definition_provider = true
-      capabilities.references_provider = true
-      capabilities.document_symbol_provider = true
-      capabilities.workspace_symbol_provider = true
-      capabilities.rename_provider = RenameOptions.new(prepare_provider: true)
+      # Build capabilities as a hash to ensure proper JSON serialization
+      capabilities = {
+        "textDocumentSync" => 1,
+        "hoverProvider" => true,
+        "completionProvider" => {
+          "triggerCharacters" => [".", ":", "@"],
+          "resolveProvider" => false
+        },
+        "signatureHelpProvider" => {
+          "triggerCharacters" => ["(", ","]
+        },
+        "definitionProvider" => true,
+        "referencesProvider" => true,
+        "documentSymbolProvider" => true,
+        "workspaceSymbolProvider" => true,
+        "renameProvider" => {
+          "prepareProvider" => true
+        }
+      }
 
       result = {
         "capabilities" => capabilities,
