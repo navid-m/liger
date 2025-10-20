@@ -1,0 +1,152 @@
+{
+  "name": "liger-crystal",
+  "displayName": "Liger - Crystal Language Support",
+  "description": "Crystal language support powered by Liger LSP server",
+  "version": "0.1.0",
+  "publisher": "liger",
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "crystal",
+    "lsp",
+    "language-server",
+    "liger"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "crystal",
+        "aliases": [
+          "Crystal",
+          "crystal"
+        ],
+        "extensions": [
+          ".cr"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "crystal",
+        "scopeName": "source.crystal",
+        "path": "./syntaxes/crystal.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Liger Crystal",
+      "properties": {
+        "liger.serverPath": {
+          "type": "string",
+          "default": "liger",
+          "description": "Path to the Liger language server executable"
+        },
+        "liger.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server"
+        },
+        "liger.maxNumberOfProblems": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of problems to show"
+        },
+        "liger.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable diagnostics (syntax errors)"
+        },
+        "liger.enableCompletion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable code completion"
+        },
+        "liger.enableHover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hover information"
+        },
+        "liger.enableDefinition": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable go to definition"
+        },
+        "liger.enableReferences": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable find references"
+        },
+        "liger.enableRename": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable rename symbol"
+        },
+        "liger.enableDocumentSymbols": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable document symbols (outline)"
+        },
+        "liger.enableWorkspaceSymbols": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable workspace symbols"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "liger.restartServer",
+        "title": "Restart Liger Language Server",
+        "category": "Liger"
+      },
+      {
+        "command": "liger.showOutputChannel",
+        "title": "Show Liger Output",
+        "category": "Liger"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.75.0",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.19.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-github-user/liger"
+  },
+  "bugs": {
+    "url": "https://github.com/your-github-user/liger/issues"
+  },
+  "license": "MIT"
+}
