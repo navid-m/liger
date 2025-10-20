@@ -10,6 +10,5 @@ module Liger
   VERSION = "0.1.0"
 end
 
-# Start the LSP server
 server = LSP::Server.new
 server.run

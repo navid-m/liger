@@ -124,20 +124,17 @@ describe LSP::TextDocumentManager do
   it "manages document lifecycle" do
     manager = LSP::TextDocumentManager.new
     
-    # Open document
     manager.open("file:///test.cr", "crystal", 1, "initial text")
     doc = manager.get("file:///test.cr")
     doc.should_not be_nil
     doc.not_nil!.text.should eq("initial text")
     
-    # Change document
     changes = [LSP::TextDocumentContentChangeEvent.new("updated text")]
     manager.change("file:///test.cr", 2, changes)
     doc = manager.get("file:///test.cr")
     doc.not_nil!.text.should eq("updated text")
     doc.not_nil!.version.should eq(2)
     
-    # Close document
     manager.close("file:///test.cr")
     manager.get("file:///test.cr").should be_nil
   end
