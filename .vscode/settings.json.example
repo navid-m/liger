@@ -1,0 +1,16 @@
+{
+  "crystal-lang.languageServer": {
+    "command": "liger",
+    "args": []
+  },
+  "crystal-lang.problems": "build",
+  "files.associations": {
+    "*.cr": "crystal"
+  },
+  "editor.formatOnSave": true,
+  "[crystal]": {
+    "editor.defaultFormatter": "crystal-lang-tools.crystal-lang",
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  }
+}

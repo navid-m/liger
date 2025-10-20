@@ -1,0 +1,13 @@
+name: liger
+version: 0.1.0
+
+authors:
+  - Navid M <navidmomtahen@gmail.com>
+
+targets:
+  liger:
+    main: src/liger.cr
+
+crystal: '>= 1.18.1'
+
+license: MIT
