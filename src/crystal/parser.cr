@@ -2,7 +2,7 @@ require "../lsp/protocol"
 require "compiler/crystal/syntax"
 
 module Liger
-  # Crystal source code parser and analyzer wrapper
+  # Source code parser and analyzer wrapper
   class CrystalParser
     property source : String
     property uri : String
@@ -15,16 +15,11 @@ module Liger
       diagnostics = [] of LSP::Diagnostic
 
       begin
-        # Use Crystal's built-in parser
         parser = ::Crystal::Parser.new(@source)
         parser.filename = @uri
         node = parser.parse
-        
-        # Check for syntax errors
-        # Crystal parser will raise on syntax errors
       rescue ex : ::Crystal::SyntaxException
-        # Convert Crystal syntax error to LSP diagnostic
-        line = ex.line_number - 1 # LSP is 0-indexed
+        line = ex.line_number - 1
         column = ex.column_number - 1
         
         range = LSP::Range.new(
@@ -39,7 +34,6 @@ module Liger
           "crystal"
         )
       rescue ex : Exception
-        # Generic error
         range = LSP::Range.new(
           LSP::Position.new(0, 0),
           LSP::Position.new(0, 1)
@@ -56,44 +50,32 @@ module Liger
       diagnostics
     end
 
-    # Find definition of symbol at position
     def find_definition(position : LSP::Position) : LSP::Location?
-      # This would require semantic analysis
-      # For now, return nil
       nil
     end
 
     # Find references to symbol at position
     def find_references(position : LSP::Position, include_declaration : Bool = false) : Array(LSP::Location)
-      # This would require semantic analysis
       [] of LSP::Location
     end
 
     # Get hover information at position
     def hover(position : LSP::Position) : LSP::Hover?
-      # This would require semantic analysis
       nil
     end
 
     # Get completions at position
     def completions(position : LSP::Position) : Array(LSP::CompletionItem)
       items = [] of LSP::CompletionItem
-
-      # Get the line and check context
       lines = @source.split('\n')
       line = lines[position.line]? || ""
       char = position.character
       
-      # Check if we're after a dot (method completion)
       if char > 0 && line[char - 1]? == '.'
-        # Add common String methods if we can detect it's a string
         add_common_methods(items)
       else
-        # Add keywords and types for general completion
         add_keywords(items)
         add_types(items)
-        
-        # Add symbols from current file
         add_file_symbols(items)
       end
 
@@ -137,8 +119,8 @@ module Liger
       end
     end
 
+    # Add common methods that work on most objects
     private def add_common_methods(items : Array(LSP::CompletionItem))
-      # Common methods that work on most objects
       common = [
         {"to_s", "Convert to String"},
         {"to_i", "Convert to Int32"},
@@ -150,7 +132,6 @@ module Liger
         {"responds_to?", "Check if responds to method"},
       ]
 
-      # String methods
       string_methods = [
         {"size", "String length"},
         {"empty?", "Check if empty"},
@@ -164,7 +145,6 @@ module Liger
         {"chars", "Get array of characters"},
       ]
 
-      # Array methods
       array_methods = [
         {"each", "Iterate over elements"},
         {"map", "Transform elements"},
@@ -186,17 +166,14 @@ module Liger
       end
     end
 
+    # Add symbols from current file
     private def add_file_symbols(items : Array(LSP::CompletionItem))
-      # Parse and extract symbols from current file
       begin
         parser = ::Crystal::Parser.new(@source)
         parser.filename = @uri
         node = parser.parse
-        
-        # Extract class and method names
         extract_completions(node, items)
       rescue
-        # Ignore parse errors
       end
     end
 
@@ -235,11 +212,9 @@ module Liger
         parser = ::Crystal::Parser.new(@source)
         parser.filename = @uri
         node = parser.parse
-        
-        # Extract symbols from AST
         extract_symbols(node, symbols)
       rescue ex : Exception
-        # If parsing fails, return empty array
+        puts "Ran into an error at document_syms, #{ex.message}"
       end
 
       symbols
@@ -280,11 +255,9 @@ module Liger
         selection_range
       )
 
-      # Extract child symbols
       children = [] of LSP::DocumentSymbol
       node.body.try { |body| extract_symbols(body, children) }
       symbol.children = children unless children.empty?
-
       symbols << symbol
     end
 
