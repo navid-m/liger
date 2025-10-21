@@ -281,7 +281,6 @@ module Liger
         selection_range
       )
 
-      # Extract child symbols
       children = [] of LSP::DocumentSymbol
       node.body.try { |body| extract_symbols(body, children) }
       symbol.children = children unless children.empty?
