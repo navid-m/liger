@@ -86,18 +86,31 @@ module Liger
         STDERR.puts "find_definition output: #{output}"
         STDERR.puts "find_definition error: #{error}" unless error.empty?
         
-        # Parse output format: filename:line:column
-        if match = output.match(/^(.+):(\d+):(\d+)/)
-          def_file = match[1]
-          def_line = match[2].to_i - 1  # Convert back to 0-indexed
-          def_col = match[3].to_i - 1
-          
-          range = LSP::Range.new(
-            LSP::Position.new(def_line, def_col),
-            LSP::Position.new(def_line, def_col + 1)
-          )
-          
-          return LSP::Location.new("file://#{def_file}", range)
+        # Parse output format: 
+        # Line 1: "N implementation(s) found"
+        # Line 2+: "filename:line:column"
+        lines = output.split('\n')
+        
+        # Find the first line that matches filename:line:column
+        lines.each do |line|
+          if match = line.match(/^(.+):(\d+):(\d+)/)
+            def_file = match[1]
+            def_line = match[2].to_i - 1  # Convert back to 0-indexed
+            def_col = match[3].to_i - 1
+            
+            # Convert Windows path to URI
+            # a:\path\file.cr -> file:///a%3A/path/file.cr
+            def_uri = filename_to_uri(def_file)
+            
+            STDERR.puts "Returning definition: #{def_uri} at #{def_line}:#{def_col}"
+            
+            range = LSP::Range.new(
+              LSP::Position.new(def_line, def_col),
+              LSP::Position.new(def_line, def_col + 1)
+            )
+            
+            return LSP::Location.new(def_uri, range)
+          end
         end
       rescue ex
         STDERR.puts "Error finding definition: #{ex.message}"
@@ -362,6 +375,27 @@ module Liger
       
       STDERR.puts "uri_to_filename output: #{filename}"
       filename
+    end
+
+    private def filename_to_uri(filename : String) : String
+      # Convert Windows path to URI
+      # a:\path\file.cr -> file:///a%3A/path/file.cr
+      
+      # Convert backslashes to forward slashes
+      path = filename.gsub('\\', '/')
+      
+      # Encode the colon in drive letter (a: -> a%3A)
+      if path =~ /^([a-zA-Z]):/
+        drive = path[0].to_s
+        rest = path[2..]
+        path = "#{drive}%3A#{rest}"
+      end
+      
+      # Add file:// prefix
+      uri = "file:///#{path}"
+      
+      STDERR.puts "filename_to_uri: #{filename} -> #{uri}"
+      uri
     end
 
     # Extract word at position from line
