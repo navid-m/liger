@@ -352,7 +352,6 @@ module LSP
       return unless doc
 
       diagnostics = @semantic_analyzer.analyze(uri)
-
       publish_params = PublishDiagnosticsParams.new(uri, diagnostics)
       @rpc.send_notification("textDocument/publishDiagnostics", JSON.parse(publish_params.to_json))
     end
