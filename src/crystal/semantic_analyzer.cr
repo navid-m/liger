@@ -105,7 +105,6 @@ module Liger
       [] of LSP::Location
     end
 
-    # Get hover information for symbol at position
     def hover(uri : String, position : LSP::Position) : LSP::Hover?
       filename = uri_to_filename(uri)
       line = position.line + 1
@@ -113,18 +112,18 @@ module Liger
       
       begin
         cursor_loc = "#{filename}:#{line}:#{column}"
-        
         output_io = IO::Memory.new
         error_io = IO::Memory.new
         
-        Process.run("crystal", ["tool", "context", "-c", cursor_loc, filename],
-                   output: output_io,
-                   error: error_io)
+        main_file = find_main_file(filename)
+        args = ["tool", "context", "-c", cursor_loc]
+        args << main_file if main_file
+        
+        Process.run("crystal", args, output: output_io, error: error_io)
         
         output = output_io.to_s
-        error = error_io.to_s
         
-        if !output.empty? && !output.includes?("Error") && !output.includes?("Usage:")
+        if !output.empty? && !output.includes?("Error") && !output.includes?("Usage:") && !output.includes?("no context")
           content = "```crystal\n#{output.strip}\n```"
           return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
         end
@@ -322,6 +321,31 @@ module Liger
       "file:///#{path}"
     end
 
+    private def find_main_file(current_file : String) : String?
+      return nil unless @workspace_root
+      
+      workspace_path = uri_to_filename(@workspace_root.not_nil!)
+      
+      candidates = [
+        File.join(workspace_path, "src", "main.cr"),
+        File.join(workspace_path, "src", File.basename(workspace_path) + ".cr"),
+        File.join(workspace_path, "main.cr"),
+      ]
+      
+      candidates.each do |candidate|
+        return candidate if File.exists?(candidate)
+      end
+      
+      if current_file.includes?("\\src\\") || current_file.includes?("/src/")
+        src_dir = current_file.split(/[\\\/]src[\\\/]/)[0] + "\\src"
+        if Dir.exists?(src_dir)
+          Dir.glob(File.join(src_dir, "*.cr")).first?
+        end
+      end
+    rescue
+      nil
+    end
+
     private def extract_word_at_position(line : String, char : Int32) : String?
       return nil if char < 0 || char > line.size
       
@@ -384,7 +408,6 @@ module Liger
         node = parser.parse
         extract_symbols_for_completion(node, items)
       rescue
-        # Ignore parse errors
       end
     end
 
