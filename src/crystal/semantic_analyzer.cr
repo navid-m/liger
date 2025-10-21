@@ -72,11 +72,28 @@ module Liger
         output_io = IO::Memory.new
         error_io = IO::Memory.new
         
-        Process.run("crystal", ["tool", "implementations", "-c", cursor_loc, filename],
+        main_file = find_main_file(filename)
+        args = ["tool", "implementations", "-c", cursor_loc]
+        args << main_file if main_file
+        
+        STDERR.puts "find_definition: cursor=#{cursor_loc}, main=#{main_file || "none"}"
+        STDERR.puts "find_definition command: crystal #{args.join(" ")}"
+        
+        if source = @sources[uri]
+          File.write(filename, source)
+          STDERR.puts "Saved current file: #{filename}"
+        end
+        
+        Process.run("crystal", args,
                    output: output_io,
                    error: error_io)
         
         output = output_io.to_s
+        error = error_io.to_s
+        
+        STDERR.puts "find_definition output: #{output}" unless output.empty?
+        STDERR.puts "find_definition error: #{error}" unless error.empty?
+        
         lines = output.split('\n')
         
         lines.each do |line|
@@ -115,6 +132,10 @@ module Liger
         cursor_loc = "#{filename}:#{line}:#{column}"
         output_io = IO::Memory.new
         error_io = IO::Memory.new
+        
+        if source = @sources[uri]
+          File.write(filename, source)
+        end
         
         main_file = find_main_file(filename)
         args = ["tool", "context", "-c", cursor_loc]
@@ -335,7 +356,8 @@ module Liger
           if targets = yaml["targets"]?
             targets.as_h.each do |name, config|
               if main_path = config["main"]?
-                main_file = File.join(workspace_path, main_path.as_s)
+                normalized_main = main_path.as_s.gsub('/', '\\')
+                main_file = File.join(workspace_path, normalized_main)
                 if File.exists?(main_file)
                   return main_file
                 else
@@ -365,7 +387,7 @@ module Liger
           return candidate
         end
       end
-
+      
       STDERR.puts "No main file found"
       nil
     rescue ex
