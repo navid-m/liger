@@ -1,54 +1,42 @@
 # Sample Crystal file for testing Liger LSP features
 
 module SampleModule
-  # A sample class demonstrating various Crystal features
   class SampleClass
-    # Instance variable
     @name : String
     @count : Int32
-
-    # Class variable
     @@total_instances = 0
 
-    # Constructor
     def initialize(@name : String, @count : Int32 = 0)
       @@total_instances += 1
     end
 
-    # Instance method with return type
     def greet : String
       "Hello, #{@name}!"
     end
 
-    # Method with parameters
     def increment(amount : Int32 = 1) : Int32
       @count += amount
       @count
     end
 
-    # Predicate method
     def empty? : Bool
       @count == 0
     end
 
-    # Method with block
     def each_count(&block : Int32 -> Nil)
       @count.times do |i|
         block.call(i)
       end
     end
 
-    # Class method
     def self.total_instances : Int32
       @@total_instances
     end
 
-    # Property macros
     property name : String
     getter count : Int32
   end
 
-  # A struct example
   struct Point
     property x : Float64
     property y : Float64
@@ -61,7 +49,6 @@ module SampleModule
     end
   end
 
-  # An enum example
   enum Color
     Red
     Green
@@ -76,7 +63,6 @@ module SampleModule
     end
   end
 
-  # A module with methods
   module Utilities
     extend self
 
@@ -90,7 +76,6 @@ module SampleModule
   end
 end
 
-# Usage examples
 sample = SampleModule::SampleClass.new("Test", 5)
 puts sample.greet
 puts sample.increment(3)
