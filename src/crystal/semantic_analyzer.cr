@@ -61,16 +61,11 @@ module Liger
     end
 
     def find_definition(uri : String, position : LSP::Position) : LSP::Location?
-      # Use Crystal's built-in tool for finding implementations
       filename = uri_to_filename(uri)
-      line = position.line + 1  # Crystal uses 1-indexed
+      line = position.line + 1
       column = position.character + 1
       
-      STDERR.puts "find_definition - filename: #{filename}"
-      
       begin
-        # Run crystal tool implementations using Process.run
-        # Format: crystal tool implementations -c file:line:column file
         cursor_loc = "#{filename}:#{line}:#{column}"
         
         output_io = IO::Memory.new
@@ -81,28 +76,15 @@ module Liger
                    error: error_io)
         
         output = output_io.to_s
-        error = error_io.to_s
-        
-        STDERR.puts "find_definition output: #{output}"
-        STDERR.puts "find_definition error: #{error}" unless error.empty?
-        
-        # Parse output format: 
-        # Line 1: "N implementation(s) found"
-        # Line 2+: "filename:line:column"
         lines = output.split('\n')
         
-        # Find the first line that matches filename:line:column
         lines.each do |line|
           if match = line.match(/^(.+):(\d+):(\d+)/)
             def_file = match[1]
-            def_line = match[2].to_i - 1  # Convert back to 0-indexed
+            def_line = match[2].to_i - 1
             def_col = match[3].to_i - 1
             
-            # Convert Windows path to URI
-            # a:\path\file.cr -> file:///a%3A/path/file.cr
             def_uri = filename_to_uri(def_file)
-            
-            STDERR.puts "Returning definition: #{def_uri} at #{def_line}:#{def_col}"
             
             range = LSP::Range.new(
               LSP::Position.new(def_line, def_col),
@@ -119,14 +101,7 @@ module Liger
       nil
     end
 
-    # Find all references to symbol at position
     def find_references(uri : String, position : LSP::Position, include_declaration : Bool = false) : Array(LSP::Location)
-      # TODO: This requires full semantic analysis
-      # Implementation would need to:
-      # 1. Find the symbol at the position
-      # 2. Search all files for references to that symbol
-      # 3. Return all locations
-      
       [] of LSP::Location
     end
 
@@ -137,7 +112,6 @@ module Liger
       column = position.character + 1
       
       begin
-        # Use crystal tool context with Process.run
         cursor_loc = "#{filename}:#{line}:#{column}"
         
         output_io = IO::Memory.new
@@ -150,9 +124,7 @@ module Liger
         output = output_io.to_s
         error = error_io.to_s
         
-        # Parse the output - it shows type information
         if !output.empty? && !output.includes?("Error") && !output.includes?("Usage:")
-          # Format as markdown
           content = "```crystal\n#{output.strip}\n```"
           return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
         end
@@ -160,7 +132,6 @@ module Liger
         STDERR.puts "Error getting hover info: #{ex.message}"
       end
       
-      # Fallback: show word at position
       source = @sources[uri]?
       return nil unless source
       
@@ -178,18 +149,10 @@ module Liger
       nil
     end
 
-    # Get signature help at position
     def signature_help(uri : String, position : LSP::Position) : LSP::SignatureHelp?
-      # TODO: This requires parsing and finding the current method call
-      # Implementation would:
-      # 1. Find the method call at the position
-      # 2. Get the method signature(s)
-      # 3. Determine which parameter is active
-      
       nil
     end
 
-    # Get completions at position
     def completions(uri : String, position : LSP::Position) : Array(LSP::CompletionItem)
       items = [] of LSP::CompletionItem
       
@@ -202,15 +165,12 @@ module Liger
       line = lines[position.line]
       prefix = line[0...position.character]
 
-      # Check if we're completing after a dot (method completion)
       if match = prefix.match(/([\w@]+)\.([\w]*)$/)
-        # Method completion - try to get type-aware completions
         filename = uri_to_filename(uri)
         line_num = position.line + 1
-        col_num = position.character - 1  # Position before the dot
+        col_num = position.character - 1 
         
         begin
-          # Use crystal tool context with Process.run
           cursor_loc = "#{filename}:#{line_num}:#{col_num}"
           
           output_io = IO::Memory.new
@@ -223,31 +183,22 @@ module Liger
           context_output = output_io.to_s
           
           if !context_output.empty? && !context_output.includes?("Error") && !context_output.includes?("Usage:")
-            # Try to extract methods for this type
             add_type_aware_completions(items, context_output)
           end
         rescue
-          # Fallback to heuristic completions
         end
-        
-        # Always add common methods as fallback
         add_common_method_completions(items)
       elsif prefix =~ /::/
-        # Constant/Type completion
         add_type_completions(items)
       else
-        # General completions: keywords, types, local variables
         add_keyword_completions(items)
         add_type_completions(items)
-        
-        # Add symbols from current file
         add_file_symbol_completions(items, source)
       end
 
       items
     end
 
-    # Prepare rename (check if symbol can be renamed)
     def prepare_rename(uri : String, position : LSP::Position) : LSP::Range?
       nil
     end
@@ -347,58 +298,30 @@ module Liger
     end
 
     private def uri_to_filename(uri : String) : String
-      # Debug: log what we receive
-      STDERR.puts "uri_to_filename input: #{uri}"
+      return uri unless uri.starts_with?("file://")
       
-      # If it's already a plain path (not a URI), return as-is
-      if !uri.starts_with?("file://")
-        STDERR.puts "uri_to_filename output (plain path): #{uri}"
-        return uri
-      end
-      
-      # Handle file:// URIs properly
-      # file:///a%3A/path -> /a%3A/path
       filename = uri.sub(/^file:\/\//, "")
-      
-      # Decode URL encoding FIRST (e.g., %3A -> :)
-      # /a%3A/path -> /a:/path
       filename = URI.decode(filename)
       
-      # On Windows, URIs look like: /a:/path
-      # Remove leading slash if it's a Windows path
       if filename =~ /^\/([a-zA-Z]):/
-        filename = filename[1..]  # Remove leading / -> a:/path
+        filename = filename[1..]
       end
       
-      # Convert forward slashes to backslashes on Windows
-      filename = filename.gsub('/', '\\')
-      
-      STDERR.puts "uri_to_filename output: #{filename}"
-      filename
+      filename.gsub('/', '\\')
     end
 
     private def filename_to_uri(filename : String) : String
-      # Convert Windows path to URI
-      # a:\path\file.cr -> file:///a%3A/path/file.cr
-      
-      # Convert backslashes to forward slashes
       path = filename.gsub('\\', '/')
       
-      # Encode the colon in drive letter (a: -> a%3A)
       if path =~ /^([a-zA-Z]):/
         drive = path[0].to_s
         rest = path[2..]
         path = "#{drive}%3A#{rest}"
       end
       
-      # Add file:// prefix
-      uri = "file:///#{path}"
-      
-      STDERR.puts "filename_to_uri: #{filename} -> #{uri}"
-      uri
+      "file:///#{path}"
     end
 
-    # Extract word at position from line
     private def extract_word_at_position(line : String, char : Int32) : String?
       return nil if char < 0 || char > line.size
       
@@ -416,17 +339,12 @@ module Liger
       line[start_pos...end_pos]
     end
 
-    # Add type-aware completions from crystal tool output
     private def add_type_aware_completions(items : Array(LSP::CompletionItem), context_output : String)
-      # Parse the context output to extract available methods
-      # This is a simplified parser - full implementation would be more robust
       if match = context_output.match(/(\w+)#(\w+)/)
         type_name = match[1]
-        # Could query for methods of this type
       end
     end
 
-    # Add common method completions (fallback)
     private def add_common_method_completions(items : Array(LSP::CompletionItem))
       common_methods = [
         {"to_s", "Convert to String", LSP::CompletionItemKind::Method},
@@ -460,7 +378,6 @@ module Liger
       end
     end
 
-    # Add symbols from current file
     private def add_file_symbol_completions(items : Array(LSP::CompletionItem), source : String)
       begin
         parser = Crystal::Parser.new(source)
@@ -471,7 +388,6 @@ module Liger
       end
     end
 
-    # Extract symbols from AST for completion
     private def extract_symbols_for_completion(node : Crystal::ASTNode, items : Array(LSP::CompletionItem))
       case node
       when Crystal::ClassDef
