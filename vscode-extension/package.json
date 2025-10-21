@@ -3,7 +3,7 @@
   "displayName": "Liger - Crystal Language Support",
   "description": "Crystal language support powered by Liger LSP server",
   "version": "0.1.0",
-  "publisher": "liger",
+  "publisher": "navid-m",
   "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.75.0"
@@ -148,10 +148,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-github-user/liger"
+    "url": "https://github.com/navid-m/liger"
   },
   "bugs": {
-    "url": "https://github.com/your-github-user/liger/issues"
+    "url": "https://github.com/navid-m/liger/issues"
   },
-  "license": "MIT"
+  "license": "GPL-3.0-only"
 }
