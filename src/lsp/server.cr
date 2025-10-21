@@ -240,9 +240,26 @@ module LSP
       return JSON.parse("null") unless doc
 
       parser = Liger::CrystalParser.new(doc.uri, doc.text)
-      symbols = parser.document_symbols
+      doc_symbols = parser.document_symbols
 
-      JSON.parse(symbols.to_json)
+      symbol_infos = [] of SymbolInformation
+      flatten_document_symbols(doc_symbols, doc.uri, symbol_infos)
+
+      JSON.parse(symbol_infos.to_json)
+    end
+
+    # Flatten hierarchical DocumentSymbol to flat SymbolInformation
+    private def flatten_document_symbols(symbols : Array(DocumentSymbol), uri : String, result : Array(SymbolInformation), container : String? = nil)
+      symbols.each do |sym|
+        location = Location.new(uri, sym.selection_range)
+        info = SymbolInformation.new(sym.name, sym.kind, location)
+        info.container_name = container if container
+        result << info
+
+        if children = sym.children?
+          flatten_document_symbols(children, uri, result, sym.name)
+        end
+      end
     end
 
     # Workspace symbol request

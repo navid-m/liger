@@ -269,6 +269,7 @@ module LSP
     property kind : SymbolKind
     property? deprecated : Bool?
     property location : Location
+    @[JSON::Field(key: "containerName")]
     property? container_name : String?
 
     def initialize(@name : String, @kind : SymbolKind, @location : Location)
