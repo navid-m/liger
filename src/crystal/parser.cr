@@ -79,7 +79,28 @@ module Liger
     def completions(position : LSP::Position) : Array(LSP::CompletionItem)
       items = [] of LSP::CompletionItem
 
-      # Add Crystal keywords
+      # Get the line and check context
+      lines = @source.split('\n')
+      line = lines[position.line]? || ""
+      char = position.character
+      
+      # Check if we're after a dot (method completion)
+      if char > 0 && line[char - 1]? == '.'
+        # Add common String methods if we can detect it's a string
+        add_common_methods(items)
+      else
+        # Add keywords and types for general completion
+        add_keywords(items)
+        add_types(items)
+        
+        # Add symbols from current file
+        add_file_symbols(items)
+      end
+
+      items
+    end
+
+    private def add_keywords(items : Array(LSP::CompletionItem))
       keywords = [
         "abstract", "alias", "annotation", "as", "as?", "asm", "begin", "break",
         "case", "class", "def", "do", "else", "elsif", "end", "ensure", "enum",
@@ -98,8 +119,9 @@ module Liger
           "Crystal keyword"
         )
       end
+    end
 
-      # Add common types
+    private def add_types(items : Array(LSP::CompletionItem))
       types = [
         "String", "Int32", "Int64", "Float64", "Bool", "Array", "Hash",
         "Nil", "Symbol", "Char", "Tuple", "NamedTuple", "Range", "Regex",
@@ -113,8 +135,96 @@ module Liger
           "Crystal type"
         )
       end
+    end
 
-      items
+    private def add_common_methods(items : Array(LSP::CompletionItem))
+      # Common methods that work on most objects
+      common = [
+        {"to_s", "Convert to String"},
+        {"to_i", "Convert to Int32"},
+        {"to_f", "Convert to Float64"},
+        {"inspect", "Return debug representation"},
+        {"class", "Return object class"},
+        {"nil?", "Check if nil"},
+        {"is_a?", "Check type"},
+        {"responds_to?", "Check if responds to method"},
+      ]
+
+      # String methods
+      string_methods = [
+        {"size", "String length"},
+        {"empty?", "Check if empty"},
+        {"upcase", "Convert to uppercase"},
+        {"downcase", "Convert to lowercase"},
+        {"strip", "Remove whitespace"},
+        {"split", "Split into array"},
+        {"starts_with?", "Check prefix"},
+        {"ends_with?", "Check suffix"},
+        {"includes?", "Check substring"},
+        {"chars", "Get array of characters"},
+      ]
+
+      # Array methods
+      array_methods = [
+        {"each", "Iterate over elements"},
+        {"map", "Transform elements"},
+        {"select", "Filter elements"},
+        {"reject", "Reject elements"},
+        {"first", "Get first element"},
+        {"last", "Get last element"},
+        {"push", "Add element"},
+        {"pop", "Remove last element"},
+        {"sort", "Sort elements"},
+      ]
+
+      (common + string_methods + array_methods).each do |method, desc|
+        items << LSP::CompletionItem.new(
+          method,
+          LSP::CompletionItemKind::Method,
+          desc
+        )
+      end
+    end
+
+    private def add_file_symbols(items : Array(LSP::CompletionItem))
+      # Parse and extract symbols from current file
+      begin
+        parser = ::Crystal::Parser.new(@source)
+        parser.filename = @uri
+        node = parser.parse
+        
+        # Extract class and method names
+        extract_completions(node, items)
+      rescue
+        # Ignore parse errors
+      end
+    end
+
+    private def extract_completions(node : ::Crystal::ASTNode, items : Array(LSP::CompletionItem))
+      case node
+      when ::Crystal::ClassDef
+        items << LSP::CompletionItem.new(
+          node.name.to_s,
+          LSP::CompletionItemKind::Class,
+          "Class defined in this file"
+        )
+        node.body.try { |body| extract_completions(body, items) }
+      when ::Crystal::ModuleDef
+        items << LSP::CompletionItem.new(
+          node.name.to_s,
+          LSP::CompletionItemKind::Module,
+          "Module defined in this file"
+        )
+        node.body.try { |body| extract_completions(body, items) }
+      when ::Crystal::Def
+        items << LSP::CompletionItem.new(
+          node.name,
+          LSP::CompletionItemKind::Method,
+          "Method defined in this file"
+        )
+      when ::Crystal::Expressions
+        node.expressions.each { |expr| extract_completions(expr, items) }
+      end
     end
 
     # Get document symbols
