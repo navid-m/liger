@@ -6,9 +6,14 @@ require "yaml"
 module Liger
   class SemanticAnalyzer
     property workspace_root : String?
+    property enable_semantic_hover : Bool = true
+    property enable_type_aware_completion : Bool = true
+    
     @sources = Hash(String, String).new
     @last_saved_hashes = Hash(String, UInt64).new
     @cache_dir : String?
+    @main_file_cache : String?
+    @main_file_cache_time : Time?
 
     def initialize(@workspace_root : String? = nil)
       if @workspace_root
@@ -362,8 +367,15 @@ module Liger
     private def find_main_file(current_file : String) : String?
       return nil unless @workspace_root
       
+      if @main_file_cache && @main_file_cache_time
+        if (Time.utc - @main_file_cache_time.not_nil!).total_seconds < 5
+          return @main_file_cache
+        end
+      end
+      
       workspace_path = uri_to_filename(@workspace_root.not_nil!)
-      shard_yml = File.join(workspace_path, "shard.yml")
+      shard_yml = File.join(workspace_path, "shard.yml")      
+      result : String? = nil
       
       if File.exists?(shard_yml)
         begin
@@ -375,9 +387,10 @@ module Liger
                 normalized_main = main_path.as_s.gsub('/', '\\')
                 main_file = File.join(workspace_path, normalized_main)
                 if File.exists?(main_file)
-                  return main_file
+                  result = main_file
+                  break
                 else
-                  STDERR.puts "Main file does not exist: #{main_file}"
+                  STDERR.puts " Main file does not exist: #{main_file}"
                 end
               end
             end
@@ -391,21 +404,29 @@ module Liger
         STDERR.puts "shard.yml not found"
       end
       
-      STDERR.puts "Trying fallback candidates..."
-      candidates = [
-        File.join(workspace_path, "src", File.basename(workspace_path) + ".cr"),
-        File.join(workspace_path, "src", "main.cr"),
-        File.join(workspace_path, "main.cr"),
-      ]
-      
-      candidates.each do |candidate|
-        if File.exists?(candidate)
-          return candidate
+      unless result
+        STDERR.puts "Trying fallback candidates..."
+        candidates = [
+          File.join(workspace_path, "src", File.basename(workspace_path) + ".cr"),
+          File.join(workspace_path, "src", "main.cr"),
+          File.join(workspace_path, "main.cr"),
+        ]
+        
+        candidates.each do |candidate|
+          STDERR.puts "  Checking: #{candidate}"
+          if File.exists?(candidate)
+            STDERR.puts "  Found: #{candidate}"
+            result = candidate
+            break
+          end
         end
       end
       
-      STDERR.puts "No main file found"
-      nil
+      @main_file_cache = result
+      @main_file_cache_time = Time.utc
+      
+      STDERR.puts result ? "Main file: #{result}" : "No main file found"
+      result
     rescue ex
       STDERR.puts "Exception in find_main_file: #{ex.message}"
       nil

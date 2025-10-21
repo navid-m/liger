@@ -105,6 +105,26 @@
           "type": "boolean",
           "default": true,
           "description": "Enable workspace symbols"
+        },
+        "liger.hoverDelay": {
+          "type": "number",
+          "default": 150,
+          "description": "Delay in milliseconds before showing hover (reduces Crystal tool calls)"
+        },
+        "liger.completionDelay": {
+          "type": "number",
+          "default": 100,
+          "description": "Delay in milliseconds before triggering completion (reduces Crystal tool calls)"
+        },
+        "liger.enableTypeAwareCompletion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable type-aware completion (slower but more accurate)"
+        },
+        "liger.enableSemanticHover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable semantic hover with Crystal tool (slower but shows types)"
         }
       }
     },
