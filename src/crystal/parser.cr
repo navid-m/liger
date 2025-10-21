@@ -214,7 +214,7 @@ module Liger
         node = parser.parse
         extract_symbols(node, symbols)
       rescue ex : Exception
-        puts "Ran into an error at document_syms, #{ex.message}"
+        STDERR.puts "Ran into an error at document_syms, #{ex.message}"
       end
 
       symbols

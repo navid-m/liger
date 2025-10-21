@@ -5,7 +5,9 @@ import {
     LanguageClientOptions,
     ServerOptions,
     Executable,
-    State
+    State,
+    ErrorAction,
+    CloseAction
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
@@ -100,11 +102,16 @@ export function activate(context: vscode.ExtensionContext) {
     log('  - Liger: Restart Liger Language Server');
 }
 
-export function deactivate(): Thenable<void> | undefined {
-    if (!client) {
-        return undefined;
+export async function deactivate(): Promise<void> {
+    if (client) {
+        log('Deactivating extension, stopping client...');
+        try {
+            await client.stop(5000);
+            log('Client stopped during deactivation');
+        } catch (error) {
+            logError('Error stopping client during deactivation', error);
+        }
     }
-    return client.stop();
 }
 
 async function startServer(context: vscode.ExtensionContext) {
@@ -131,19 +138,32 @@ async function startServer(context: vscode.ExtensionContext) {
     log(`  Args: ${JSON.stringify(serverExecutable.args)}`);
 
     const serverOptions: ServerOptions = serverExecutable;
+    const fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.cr');
+    context.subscriptions.push(fileWatcher);
+    
     const clientOptions: LanguageClientOptions = {
         documentSelector: [
             { scheme: 'file', language: 'crystal' },
             { scheme: 'untitled', language: 'crystal' }
         ],
         synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/*.cr')
+            fileEvents: fileWatcher
         },
         outputChannel: outputChannel,
         traceOutputChannel: outputChannel,
         revealOutputChannelOn: 4,
         initializationOptions: {
             maxNumberOfProblems: config.get('maxNumberOfProblems', 100)
+        },
+        errorHandler: {
+            error: (error, message, count) => {
+                logError(`Language client error (count: ${count})`, error);
+                return { action: ErrorAction.Continue };
+            },
+            closed: () => {
+                log('Connection to server closed');
+                return { action: CloseAction.DoNotRestart };
+            }
         }
     };
 
@@ -254,9 +274,14 @@ async function restartServer(context: vscode.ExtensionContext) {
     
     if (client) {
         log('Stopping existing client...');
-        await client.stop();
-        client = undefined;
-        log('Client stopped');
+        try {
+            await client.stop(5000);
+            log('Client stopped successfully');
+        } catch (error) {
+            logError('Error stopping client', error);
+        } finally {
+            client = undefined;
+        }
     }
 
     log('Starting new server instance...');
