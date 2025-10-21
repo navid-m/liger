@@ -7,8 +7,15 @@ module Liger
   class SemanticAnalyzer
     property workspace_root : String?
     @sources = Hash(String, String).new
+    @last_saved_hashes = Hash(String, UInt64).new
+    @cache_dir : String?
 
     def initialize(@workspace_root : String? = nil)
+      if @workspace_root
+        workspace_path = uri_to_filename(@workspace_root.not_nil!)
+        @cache_dir = File.join(workspace_path, ".liger-cache")
+        Dir.mkdir_p(@cache_dir.not_nil!) unless Dir.exists?(@cache_dir.not_nil!)
+      end
     end
 
     def update_source(uri : String, source : String)
@@ -71,7 +78,6 @@ module Liger
         
         output_io = IO::Memory.new
         error_io = IO::Memory.new
-        
         main_file = find_main_file(filename)
         args = ["tool", "implementations", "-c", cursor_loc]
         args << main_file if main_file
@@ -80,8 +86,14 @@ module Liger
         STDERR.puts "find_definition command: crystal #{args.join(" ")}"
         
         if source = @sources[uri]
-          File.write(filename, source)
-          STDERR.puts "Saved current file: #{filename}"
+          source_hash = source.hash
+          if @last_saved_hashes[uri]? != source_hash
+            File.write(filename, source)
+            @last_saved_hashes[uri] = source_hash
+            STDERR.puts "Saved current file: #{filename}"
+          else
+            STDERR.puts "File unchanged, skipping save: #{filename}"
+          end
         end
         
         Process.run("crystal", args,
@@ -134,7 +146,11 @@ module Liger
         error_io = IO::Memory.new
         
         if source = @sources[uri]
-          File.write(filename, source)
+          source_hash = source.hash
+          if @last_saved_hashes[uri]? != source_hash
+            File.write(filename, source)
+            @last_saved_hashes[uri] = source_hash
+          end
         end
         
         main_file = find_main_file(filename)
