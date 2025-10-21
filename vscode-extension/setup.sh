@@ -6,25 +6,20 @@ set -e
 
 echo "Setting up Liger VS Code Extension..."
 
-# Check if Node.js is installed
 if ! command -v node &> /dev/null; then
-    echo "Error: Node.js is not installed. Please install Node.js first."
+    echo "Error: Node.js is not installed. Install Node.js first."
     exit 1
 fi
 
 echo "Node.js version: $(node --version)"
-
-# Install dependencies
 echo ""
 echo "Installing dependencies..."
 npm install
 
-# Compile TypeScript
 echo ""
 echo "Compiling TypeScript..."
 npm run compile
 
-# Package extension
 echo ""
 echo "Packaging extension..."
 npm run package

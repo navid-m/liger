@@ -3,15 +3,13 @@
 
 Write-Host "Setting up Liger VS Code Extension..." -ForegroundColor Green
 
-# Check if Node.js is installed
 if (!(Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host "Error: Node.js is not installed. Please install Node.js first." -ForegroundColor Red
+    Write-Host "Error: Node.js is not installed. Install Node.js first." -ForegroundColor Red
     exit 1
 }
 
 Write-Host "Node.js version: $(node --version)" -ForegroundColor Cyan
 
-# Install dependencies
 Write-Host "`nInstalling dependencies..." -ForegroundColor Green
 npm install
 
@@ -20,7 +18,6 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Compile TypeScript
 Write-Host "`nCompiling TypeScript..." -ForegroundColor Green
 npm run compile
 
@@ -29,7 +26,6 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Package extension
 Write-Host "`nPackaging extension..." -ForegroundColor Green
 npm run package
 
