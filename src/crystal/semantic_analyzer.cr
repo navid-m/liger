@@ -336,15 +336,24 @@ module Liger
             targets.as_h.each do |name, config|
               if main_path = config["main"]?
                 main_file = File.join(workspace_path, main_path.as_s)
-                return main_file if File.exists?(main_file)
+                if File.exists?(main_file)
+                  return main_file
+                else
+                  STDERR.puts "Main file does not exist: #{main_file}"
+                end
               end
             end
+          else
+            STDERR.puts "No targets section found in shard.yml"
           end
         rescue ex
           STDERR.puts "Error parsing shard.yml: #{ex.message}"
         end
+      else
+        STDERR.puts "shard.yml not found"
       end
       
+      STDERR.puts "Trying fallback candidates..."
       candidates = [
         File.join(workspace_path, "src", File.basename(workspace_path) + ".cr"),
         File.join(workspace_path, "src", "main.cr"),
@@ -352,17 +361,20 @@ module Liger
       ]
       
       candidates.each do |candidate|
-        return candidate if File.exists?(candidate)
+        if File.exists?(candidate)
+          return candidate
+        end
       end
-      
+
+      STDERR.puts "No main file found"
       nil
-    rescue
+    rescue ex
+      STDERR.puts "Exception in find_main_file: #{ex.message}"
       nil
     end
 
     private def extract_word_at_position(line : String, char : Int32) : String?
       return nil if char < 0 || char > line.size
-      
       start_pos = char
       while start_pos > 0 && word_char?(line[start_pos - 1])
         start_pos -= 1
