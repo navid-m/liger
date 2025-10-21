@@ -1,18 +1,21 @@
 require "./protocol"
 
 module LSP
-  # Manages text documents
+  # Manages text documents and provides methods to open, close, and change them
   class TextDocumentManager
     @documents = Hash(DocumentUri, TextDocument).new
 
+    # Open a text document
     def open(uri : DocumentUri, language_id : String, version : Int32, text : String)
       @documents[uri] = TextDocument.new(uri, language_id, version, text)
     end
 
+    # Close a text document
     def close(uri : DocumentUri)
       @documents.delete(uri)
     end
 
+    # Change a text document
     def change(uri : DocumentUri, version : Int32, changes : Array(TextDocumentContentChangeEvent))
       doc = @documents[uri]?
       return unless doc
@@ -23,10 +26,12 @@ module LSP
       doc.version = version
     end
 
+    # Get a text document
     def get(uri : DocumentUri) : TextDocument?
       @documents[uri]?
     end
 
+    # Get all text documents
     def all : Array(TextDocument)
       @documents.values
     end
@@ -40,28 +45,27 @@ module LSP
     property text : String
     property lines : Array(String)
 
+    # Initialize a text document
     def initialize(@uri : DocumentUri, @language_id : String, @version : Int32, @text : String)
       @lines = @text.split('\n')
     end
 
+    # Apply a change to the text document
     def apply_change(change : TextDocumentContentChangeEvent)
       if range = change.range
-        # Incremental change
         apply_incremental_change(range, change.text)
       else
-        # Full document change
         @text = change.text
         @lines = @text.split('\n')
       end
     end
 
+    # Apply an incremental change to the text document
     private def apply_incremental_change(range : Range, new_text : String)
       start_line = range.start.line
       start_char = range.start.character
       end_line = range.end.line
       end_char = range.end.character
-
-      # Get the text before and after the range
       before = ""
       if start_line > 0
         before = @lines[0...start_line].join('\n') + '\n'
@@ -76,15 +80,16 @@ module LSP
         end
       end
 
-      # Apply the change
       @text = before + new_text + after
       @lines = @text.split('\n')
     end
 
+    # Get a line from the text document
     def get_line(line : Int32) : String?
       @lines[line]? if line >= 0 && line < @lines.size
     end
 
+    # Get a word at a position in the text document
     def get_word_at_position(position : Position) : String?
       line = get_line(position.line)
       return nil unless line
@@ -92,7 +97,6 @@ module LSP
       char = position.character
       return nil if char < 0 || char > line.size
 
-      # Find word boundaries
       start_pos = char
       while start_pos > 0 && word_char?(line[start_pos - 1])
         start_pos -= 1
@@ -111,18 +115,20 @@ module LSP
       char.alphanumeric? || char == '_' || char == '?' || char == '!'
     end
 
+    # Get the offset at a position in the text document
     def offset_at(position : Position) : Int32
       offset = 0
       position.line.times do |i|
-        offset += (@lines[i]?.try(&.size) || 0) + 1 # +1 for newline
+        offset += (@lines[i]?.try(&.size) || 0) + 1 
       end
       offset + position.character
     end
 
+    # Get the position at an offset in the text document
     def position_at(offset : Int32) : Position
       current_offset = 0
       @lines.each_with_index do |line, i|
-        line_length = line.size + 1 # +1 for newline
+        line_length = line.size + 1 
         if current_offset + line_length > offset
           return Position.new(i, offset - current_offset)
         end
