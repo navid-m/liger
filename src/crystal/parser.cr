@@ -319,7 +319,6 @@ module Liger
 
       start_pos = LSP::Position.new(location.line_number - 1, location.column_number - 1)
       end_pos = LSP::Position.new(start_pos.line, start_pos.character + target.name.size)
-
       range = LSP::Range.new(start_pos, end_pos)
 
       symbols << LSP::DocumentSymbol.new(
