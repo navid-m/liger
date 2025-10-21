@@ -1,6 +1,7 @@
 require "../lsp/protocol"
 require "compiler/crystal/syntax"
 require "uri"
+require "yaml"
 
 module Liger
   class SemanticAnalyzer
@@ -325,10 +326,28 @@ module Liger
       return nil unless @workspace_root
       
       workspace_path = uri_to_filename(@workspace_root.not_nil!)
+      shard_yml = File.join(workspace_path, "shard.yml")
+      
+      if File.exists?(shard_yml)
+        begin
+          yaml = YAML.parse(File.read(shard_yml))
+          
+          if targets = yaml["targets"]?
+            targets.as_h.each do |name, config|
+              if main_path = config["main"]?
+                main_file = File.join(workspace_path, main_path.as_s)
+                return main_file if File.exists?(main_file)
+              end
+            end
+          end
+        rescue ex
+          STDERR.puts "Error parsing shard.yml: #{ex.message}"
+        end
+      end
       
       candidates = [
-        File.join(workspace_path, "src", "main.cr"),
         File.join(workspace_path, "src", File.basename(workspace_path) + ".cr"),
+        File.join(workspace_path, "src", "main.cr"),
         File.join(workspace_path, "main.cr"),
       ]
       
@@ -336,12 +355,7 @@ module Liger
         return candidate if File.exists?(candidate)
       end
       
-      if current_file.includes?("\\src\\") || current_file.includes?("/src/")
-        src_dir = current_file.split(/[\\\/]src[\\\/]/)[0] + "\\src"
-        if Dir.exists?(src_dir)
-          Dir.glob(File.join(src_dir, "*.cr")).first?
-        end
-      end
+      nil
     rescue
       nil
     end
