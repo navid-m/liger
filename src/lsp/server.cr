@@ -6,6 +6,7 @@ require "../crystal/parser"
 require "../crystal/semantic_analyzer"
 
 module LSP
+  # LSP server implementation
   class Server
     @rpc : JsonRpcHandler
     @document_manager : TextDocumentManager
@@ -14,6 +15,7 @@ module LSP
     @workspace_root : String?
     @shutdown_requested = false
 
+    # Initialize the server
     def initialize(input : IO = STDIN, output : IO = STDOUT)
       @rpc = JsonRpcHandler.new(input, output)
       @document_manager = TextDocumentManager.new
@@ -22,11 +24,13 @@ module LSP
       setup_handlers
     end
 
+    # Run the server
     def run
       STDERR.puts "Liger LSP server starting..."
       @rpc.listen
     end
 
+    # Setup request and notification handlers
     private def setup_handlers
       @rpc.on_request("initialize") { |params| handle_initialize(params) }
       @rpc.on_notification("initialized") { |params| handle_initialized(params) }
@@ -47,6 +51,7 @@ module LSP
       @rpc.on_request("textDocument/prepareRename") { |params| handle_prepare_rename(params) }
     end
 
+    # Handle an initialize request
     private def handle_initialize(params : JSON::Any?) : JSON::Any
       STDERR.puts "Handling initialize request"
       
@@ -56,7 +61,6 @@ module LSP
         @semantic_analyzer.workspace_root = root_uri
       end
 
-      # Build capabilities as a hash to ensure proper JSON serialization
       capabilities = {
         "textDocumentSync" => 1,
         "hoverProvider" => true,
@@ -88,21 +92,25 @@ module LSP
       JSON.parse(result.to_json)
     end
 
+    # Handle an initialized notification
     private def handle_initialized(params : JSON::Any?)
       STDERR.puts "Server initialized"
     end
 
+    # Handle a shutdown request
     private def handle_shutdown(params : JSON::Any?) : JSON::Any
       STDERR.puts "Shutdown requested"
       @shutdown_requested = true
       JSON.parse("null")
     end
 
+    # Handle an exit notification
     private def handle_exit(params : JSON::Any?)
       STDERR.puts "Exiting"
       exit(@shutdown_requested ? 0 : 1)
     end
 
+    # Handle a didOpen notification
     private def handle_did_open(params : JSON::Any?)
       return unless params
 
@@ -115,6 +123,7 @@ module LSP
       send_diagnostics(doc.uri)
     end
 
+    # Handle a didChange notification
     private def handle_did_change(params : JSON::Any?)
       return unless params
 
@@ -130,6 +139,7 @@ module LSP
       send_diagnostics(doc.uri)
     end
 
+    # Handle a didClose notification
     private def handle_did_close(params : JSON::Any?)
       return unless params
 
@@ -138,6 +148,7 @@ module LSP
       @semantic_analyzer.remove_source(did_close.text_document.uri)
     end
 
+    # Handle a didSave notification
     private def handle_did_save(params : JSON::Any?)
       return unless params
 
@@ -346,6 +357,7 @@ module LSP
       @rpc.send_notification("textDocument/publishDiagnostics", JSON.parse(publish_params.to_json))
     end
 
+    # Check if a character is a word character
     private def word_char?(char : Char) : Bool
       char.alphanumeric? || char == '_' || char == '?' || char == '!'
     end
