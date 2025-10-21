@@ -10,5 +10,10 @@ module Liger
   VERSION = "0.1.0"
 end
 
-server = LSP::Server.new
-server.run
+begin
+  server = LSP::Server.new
+  server.run
+rescue exception
+  STDERR.puts "Server crashed: #{exception.message}"
+  STDERR.flush
+end
