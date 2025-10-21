@@ -33,7 +33,6 @@ function logError(message: string, error?: any) {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    // Create output channel FIRST before anything else
     outputChannel = vscode.window.createOutputChannel('Liger Crystal');
     
     log('=== Liger Crystal Extension Activating ===');
@@ -41,10 +40,8 @@ export function activate(context: vscode.ExtensionContext) {
     log(`Extension path: ${context.extensionPath}`);
     log(`Workspace folders: ${vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath).join(', ') || 'none'}`);
     
-    // Show output channel immediately for debugging
-    outputChannel.show(true); // true = preserve focus
+    outputChannel.show(true);
 
-    // Create status bar item
     statusBarItem = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Right,
         100
@@ -55,7 +52,6 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
 
-    // Register commands BEFORE starting server
     log('Registering commands...');
     
     const restartCommand = vscode.commands.registerCommand('liger.restartServer', async () => {
@@ -78,7 +74,6 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(diagnosticsCommand);
     log('  ✓ Registered: liger.showDiagnostics');
 
-    // Log when Crystal files are opened
     context.subscriptions.push(
         vscode.workspace.onDidOpenTextDocument((document) => {
             if (document.languageId === 'crystal') {
@@ -89,14 +84,12 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Check if any .cr files are already open
     const openCrystalFiles = vscode.workspace.textDocuments.filter(doc => doc.languageId === 'crystal');
     log(`Currently open Crystal files: ${openCrystalFiles.length}`);
     openCrystalFiles.forEach(doc => {
         log(`  - ${doc.uri.fsPath}`);
     });
 
-    // Start the language server
     log('Starting language server...');
     startServer(context);
 
@@ -123,11 +116,8 @@ async function startServer(context: vscode.ExtensionContext) {
     log(`  Server path: ${serverPath}`);
     log(`  Trace level: ${traceLevel}`);
     log(`  Max problems: ${config.get('maxNumberOfProblems', 100)}`);
-
-    // Check if server executable exists
     log(`Attempting to start server: ${serverPath}`);
 
-    // Server executable options
     const serverExecutable: Executable = {
         command: serverPath,
         args: [],
@@ -141,8 +131,6 @@ async function startServer(context: vscode.ExtensionContext) {
     log(`  Args: ${JSON.stringify(serverExecutable.args)}`);
 
     const serverOptions: ServerOptions = serverExecutable;
-
-    // Client options
     const clientOptions: LanguageClientOptions = {
         documentSelector: [
             { scheme: 'file', language: 'crystal' },
@@ -153,7 +141,7 @@ async function startServer(context: vscode.ExtensionContext) {
         },
         outputChannel: outputChannel,
         traceOutputChannel: outputChannel,
-        revealOutputChannelOn: 4, // Never automatically show
+        revealOutputChannelOn: 4,
         initializationOptions: {
             maxNumberOfProblems: config.get('maxNumberOfProblems', 100)
         }
@@ -162,8 +150,6 @@ async function startServer(context: vscode.ExtensionContext) {
     log(`Client options configured:`);
     log(`  Document selector: ${JSON.stringify(clientOptions.documentSelector)}`);
     log(`  File watcher pattern: **/*.cr`);
-
-    // Create the language client
     log('Creating LanguageClient instance...');
     client = new LanguageClient(
         'ligerCrystal',
@@ -172,7 +158,6 @@ async function startServer(context: vscode.ExtensionContext) {
         clientOptions
     );
 
-    // Add client event handlers for debugging
     client.onDidChangeState((event) => {
         log(`Client state changed: ${State[event.oldState]} -> ${State[event.newState]}`);
         
@@ -194,21 +179,18 @@ async function startServer(context: vscode.ExtensionContext) {
         }
     });
 
-    // Start the client (this will also launch the server)
     try {
         log('Starting language client...');
         await client.start();
         log('✓ Liger language server started successfully');
         log(`Client state: ${State[client.state]}`);
         
-        // Show status bar
         if (statusBarItem) {
             statusBarItem.text = '$(check) Liger';
             statusBarItem.tooltip = 'Liger Crystal Language Server is running';
             statusBarItem.show();
         }
 
-        // Log server capabilities
         log('Server capabilities:');
         const capabilities = client.initializeResult?.capabilities;
         if (capabilities) {
@@ -224,7 +206,6 @@ async function startServer(context: vscode.ExtensionContext) {
             logError('No server capabilities received!');
         }
 
-        // Test if server is responding
         log('Testing server connection...');
         setTimeout(async () => {
             const activeEditor = vscode.window.activeTextEditor;
