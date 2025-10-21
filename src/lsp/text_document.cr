@@ -254,7 +254,9 @@ module LSP
   struct CompletionContext
     include JSON::Serializable
 
+    @[JSON::Field(key: "triggerKind")]
     property trigger_kind : Int32
+    @[JSON::Field(key: "triggerCharacter")]
     property? trigger_character : String?
   end
 
