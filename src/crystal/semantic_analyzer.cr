@@ -70,12 +70,13 @@ module Liger
       
       begin
         # Run crystal tool implementations using Process.run
-        location_arg = "#{filename}:#{line}:#{column}"
+        # Format: crystal tool implementations -c file:line:column file
+        cursor_loc = "#{filename}:#{line}:#{column}"
         
         output_io = IO::Memory.new
         error_io = IO::Memory.new
         
-        Process.run("crystal", ["tool", "implementations", location_arg],
+        Process.run("crystal", ["tool", "implementations", "-c", cursor_loc, filename],
                    output: output_io,
                    error: error_io)
         
