@@ -2,7 +2,7 @@
   "name": "liger-crystal",
   "displayName": "Liger - Crystal Language Support",
   "description": "Crystal language support powered by Liger LSP server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "navid-m",
   "icon": "images/icon.png",
   "engines": {

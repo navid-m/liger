@@ -94,11 +94,37 @@ module Liger
         "when", "while", "with", "yield"
       ]
 
+      spec_keywords = [
+        "describe", "context", "it", "pending", "before_each", "after_each",
+        "before_all", "after_all"
+      ]
+
+      builtin_methods = [
+        "puts", "print", "p", "pp", "gets", "raise", "abort", "exit",
+        "sleep", "spawn", "at_exit", "loop", "caller", "system"
+      ]
+
       keywords.each do |keyword|
         items << LSP::CompletionItem.new(
           keyword,
           LSP::CompletionItemKind::Keyword,
           "Crystal keyword"
+        )
+      end
+
+      spec_keywords.each do |keyword|
+        items << LSP::CompletionItem.new(
+          keyword,
+          LSP::CompletionItemKind::Function,
+          "Spec keyword"
+        )
+      end
+
+      builtin_methods.each do |method|
+        items << LSP::CompletionItem.new(
+          method,
+          LSP::CompletionItemKind::Function,
+          "Built-in method"
         )
       end
     end
@@ -119,7 +145,6 @@ module Liger
       end
     end
 
-    # Add common methods that work on most objects
     private def add_common_methods(items : Array(LSP::CompletionItem))
       common = [
         {"to_s", "Convert to String"},
@@ -166,7 +191,6 @@ module Liger
       end
     end
 
-    # Add symbols from current file
     private def add_file_symbols(items : Array(LSP::CompletionItem))
       begin
         parser = ::Crystal::Parser.new(@source)
@@ -204,7 +228,6 @@ module Liger
       end
     end
 
-    # Get document symbols
     def document_symbols : Array(LSP::DocumentSymbol)
       symbols = [] of LSP::DocumentSymbol
 
