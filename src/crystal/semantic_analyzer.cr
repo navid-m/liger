@@ -119,7 +119,11 @@ module Liger
       if dot_pos = find_dot_in_line(line_text, position.character)
         receiver_word = extract_word_before_dot(line_text, dot_pos)
         if receiver_word
-          receiver_type = @workspace_analyzer.get_type_at_position(uri, source, LSP::Position.new(position.line, dot_pos - 1))
+          receiver_type = @workspace_analyzer.get_type_at_position(
+            uri,
+            source,
+            LSP::Position.new(position.line, dot_pos - 1)
+          )
           if receiver_type
             symbol = @workspace_analyzer.find_method_definition(receiver_type, word)
             if symbol
