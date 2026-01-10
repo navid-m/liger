@@ -7,6 +7,7 @@ module LSP
   # Position in a text document
   struct Position
     include JSON::Serializable
+    include Comparable(Position)
 
     property line : Int32
     property character : Int32
@@ -67,7 +68,12 @@ module LSP
     property? tags : Array(Int32)?
     property? related_information : Array(DiagnosticRelatedInformation)?
 
-    def initialize(@range : Range, @message : String, @severity : DiagnosticSeverity? = nil, @source : String? = nil)
+    def initialize(
+      @range : Range,
+      @message : String,
+      @severity : DiagnosticSeverity? = nil,
+      @source : String? = nil,
+    )
     end
   end
 
