@@ -196,7 +196,11 @@ module Liger
       nil
     end
 
-    def find_references(uri : String, position : LSP::Position, include_declaration : Bool = false) : Array(LSP::Location)
+    def find_references(
+      uri : String,
+      position : LSP::Position,
+      include_declaration : Bool = false,
+    ) : Array(LSP::Location)
       [] of LSP::Location
     end
 
@@ -204,7 +208,6 @@ module Liger
       source = @sources[uri]?
       return nil unless source
 
-      # First try workspace analysis
       if type_info = @workspace_analyzer.get_type_at_position(uri, source, position)
         lines = source.split('\n')
         return nil if position.line >= lines.size
@@ -243,7 +246,9 @@ module Liger
 
         output = output_io.to_s
 
-        if !output.empty? && !output.includes?("Error") && !output.includes?("Usage:") && !output.includes?("no context")
+        if !output.empty? && !output.includes?("Error") &&
+           !output.includes?("Usage:") &&
+           !output.includes?("no context")
           content = "```crystal\n#{output.strip}\n```"
           return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
         end
