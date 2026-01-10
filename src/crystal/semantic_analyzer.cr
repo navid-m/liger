@@ -29,6 +29,7 @@ module Liger
     def update_source(uri : String, source : String)
       @sources[uri] = source
       @workspace_analyzer.update_source(uri, source)
+      @workspace_analyzer.force_scan
     end
 
     def remove_source(uri : String)
