@@ -260,7 +260,12 @@ module LSP
     end
 
     # Flatten hierarchical DocumentSymbol to flat SymbolInformation
-    private def flatten_document_symbols(symbols : Array(DocumentSymbol), uri : String, result : Array(SymbolInformation), container : String? = nil)
+    private def flatten_document_symbols(
+      symbols : Array(DocumentSymbol),
+      uri : String,
+      result : Array(SymbolInformation),
+      container : String? = nil,
+    )
       symbols.each do |sym|
         location = Location.new(uri, sym.selection_range)
         info = SymbolInformation.new(sym.name, sym.kind, location)
