@@ -684,7 +684,11 @@ module Liger
       "Object"
     end
 
-    private def get_hover_from_workspace(uri : String, source : String, position : LSP::Position) : LSP::Hover?
+    private def get_hover_from_workspace(
+      uri : String,
+      source : String,
+      position : LSP::Position,
+    ) : LSP::Hover?
       lines = source.split('\n')
       return nil if position.line >= lines.size
 
@@ -740,7 +744,9 @@ module Liger
       lines = source.split('\n')
 
       lines.each_with_index do |line, line_num|
-        if match = line.match(/^\s*((?:private\s+)?def\s+#{Regex.escape(method_name)}\s*(?:\([^)]*\))?\s*(?::\s*\w+)?)/)
+        if match = line.match(
+             /^\s*((?:private\s+)?def\s+#{Regex.escape(method_name)}\s*(?:\([^)]*\))?\s*(?::\s*\w+)?)/
+           )
           signature = match[1].strip
 
           if line.ends_with?("\\") || (!line.includes?(")") && line.includes?("("))
@@ -773,7 +779,9 @@ module Liger
           return match[1].strip
         end
 
-        if match = line.match(/^\s*((?:property|getter|setter)\s+#{Regex.escape(method_name.sub("@", ""))}\s*:\s*\w+)/)
+        if match = line.match(
+             /^\s*((?:property|getter|setter)\s+#{Regex.escape(method_name.sub("@", ""))}\s*:\s*\w+)/
+           )
           return match[1].strip
         end
 
@@ -870,7 +878,9 @@ module Liger
         end
 
         # Property declarations
-        if match = line.match(/^\s*(?:property|getter|setter)\s+(#{Regex.escape(symbol_name.sub("@", ""))})(?:\s|$)/)
+        if match = line.match(
+             /^\s*(?:property|getter|setter)\s+(#{Regex.escape(symbol_name.sub("@", ""))})(?:\s|$)/
+           )
           range = LSP::Range.new(
             LSP::Position.new(line_num, match.begin(1).not_nil!),
             LSP::Position.new(line_num, match.end(1).not_nil!)
