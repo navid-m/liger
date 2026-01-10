@@ -212,17 +212,8 @@ module Liger
       source = @sources[uri]?
       return nil unless source
 
-      if type_info = @workspace_analyzer.get_type_at_position(uri, source, position)
-        lines = source.split('\n')
-        return nil if position.line >= lines.size
-
-        line_text = lines[position.line]
-        word = extract_word_at_position(line_text, position.character)
-
-        if word && !word.empty?
-          content = "```crystal\n#{word} : #{type_info}\n```"
-          return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
-        end
+      if hover_info = get_hover_from_workspace(uri, source, position)
+        return hover_info
       end
 
       filename = uri_to_filename(uri)
@@ -687,6 +678,111 @@ module Liger
       end
 
       "Object"
+    end
+
+    private def get_hover_from_workspace(uri : String, source : String, position : LSP::Position) : LSP::Hover?
+      lines = source.split('\n')
+      return nil if position.line >= lines.size
+
+      line_text = lines[position.line]
+      word = extract_word_at_position(line_text, position.character)
+      return nil unless word
+
+      if signature = find_signature_in_current_file(source, word)
+        content = "```crystal\n#{signature}\n```"
+        return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+      end
+
+      if symbol = @workspace_analyzer.find_symbol_info(word)
+        content = case symbol.kind
+                  when "method"
+                    if signature = symbol.signature
+                      "```crystal\n#{signature}\n```"
+                    else
+                      "```crystal\ndef #{symbol.name} : #{symbol.type}\n```"
+                    end
+                  when "class"
+                    "```crystal\nclass #{symbol.name} < #{symbol.type}\n```"
+                  when "module"
+                    "```crystal\nmodule #{symbol.name}\n```"
+                  when "enum"
+                    "```crystal\nenum #{symbol.name}\n```"
+                  when "struct"
+                    "```crystal\nstruct #{symbol.name}\n```"
+                  when "property", "getter", "setter"
+                    "```crystal\n#{symbol.kind} #{symbol.name.sub("@", "")} : #{symbol.type}\n```"
+                  when "instance_variable"
+                    "```crystal\n#{symbol.name} : #{symbol.type}\n```"
+                  when "constant"
+                    "```crystal\n#{symbol.name} : #{symbol.type}\n```"
+                  when "alias"
+                    "```crystal\nalias #{symbol.name} = #{symbol.type}\n```"
+                  else
+                    "```crystal\n#{symbol.name} : #{symbol.type}\n```"
+                  end
+
+        return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+      end
+
+      if type_info = @workspace_analyzer.get_type_at_position(uri, source, position)
+        content = "```crystal\n#{word} : #{type_info}\n```"
+        return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+      end
+
+      nil
+    end
+
+    private def find_signature_in_current_file(source : String, method_name : String) : String?
+      lines = source.split('\n')
+
+      lines.each_with_index do |line, line_num|
+        if match = line.match(/^\s*((?:private\s+)?def\s+#{Regex.escape(method_name)}\s*(?:\([^)]*\))?\s*(?::\s*\w+)?)/)
+          signature = match[1].strip
+
+          if line.ends_with?("\\") || (!line.includes?(")") && line.includes?("("))
+            full_signature = signature
+            (line_num + 1...lines.size).each do |i|
+              next_line = lines[i].strip
+              full_signature += " " + next_line
+              break if next_line.includes?(")")
+              break if i > line_num + 5
+            end
+            return full_signature
+          end
+
+          return signature
+        end
+
+        if match = line.match(/^\s*(class\s+#{Regex.escape(method_name)}(?:\s*<\s*\w+)?)/)
+          return match[1].strip
+        end
+
+        if match = line.match(/^\s*(module\s+#{Regex.escape(method_name)})/)
+          return match[1].strip
+        end
+
+        if match = line.match(/^\s*(enum\s+#{Regex.escape(method_name)})/)
+          return match[1].strip
+        end
+
+        if match = line.match(/^\s*(struct\s+#{Regex.escape(method_name)})/)
+          return match[1].strip
+        end
+
+        if match = line.match(/^\s*((?:property|getter|setter)\s+#{Regex.escape(method_name.sub("@", ""))}\s*:\s*\w+)/)
+          return match[1].strip
+        end
+
+        if match = line.match(/^\s*(#{Regex.escape(method_name)}\s*=\s*.+)/)
+          return match[1].strip
+        end
+
+        if match = line.match(/^\s*(alias\s+#{Regex.escape(method_name)}\s*=\s*.+)/)
+          return match[1].strip
+        end
+      end
+
+      nil
     end
 
     private def find_definition_in_current_file(
