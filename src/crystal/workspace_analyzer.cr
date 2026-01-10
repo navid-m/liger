@@ -642,27 +642,32 @@ module Liger
         # property name : Type
         if match = line.match(/property\s+#{Regex.escape(clean_name)}\s*:\s*(\w+)/)
           doc = extract_documentation(lines, line_num)
-          return SymbolInfo.new(property_name, match[1], "property", uri_to_filename(uri), line_num, line.strip, doc)
+          return SymbolInfo.new(
+            property_name, match[1], "property", uri_to_filename(uri), line_num, line.strip, doc)
         end
         # getter name : Type
         if match = line.match(/getter\s+#{Regex.escape(clean_name)}\s*:\s*(\w+)/)
           doc = extract_documentation(lines, line_num)
-          return SymbolInfo.new(property_name, match[1], "getter", uri_to_filename(uri), line_num, line.strip, doc)
+          return SymbolInfo.new(
+            property_name, match[1], "getter", uri_to_filename(uri), line_num, line.strip, doc)
         end
         # setter name : Type
         if match = line.match(/setter\s+#{Regex.escape(clean_name)}\s*:\s*(\w+)/)
           doc = extract_documentation(lines, line_num)
-          return SymbolInfo.new(property_name, match[1], "setter", uri_to_filename(uri), line_num, line.strip, doc)
+          return SymbolInfo.new(
+            property_name, match[1], "setter", uri_to_filename(uri), line_num, line.strip, doc)
         end
         # @name : Type
         if match = line.match(/#{Regex.escape(property_name)}\s*:\s*(\w+)/)
           doc = extract_documentation(lines, line_num)
-          return SymbolInfo.new(property_name, match[1], "instance_variable", uri_to_filename(uri), line_num, line.strip, doc)
+          return SymbolInfo.new(
+            property_name, match[1], "instance_variable", uri_to_filename(uri), line_num, line.strip, doc)
         end
         # def initialize(@name : Type)
         if match = line.match(/def\s+initialize\([^)]*#{Regex.escape(property_name)}\s*:\s*(\w+)/)
           doc = extract_documentation(lines, line_num)
-          return SymbolInfo.new(property_name, match[1], "instance_variable", uri_to_filename(uri), line_num, line.strip, doc)
+          return SymbolInfo.new(
+            property_name, match[1], "instance_variable", uri_to_filename(uri), line_num, line.strip, doc)
         end
       end
 
