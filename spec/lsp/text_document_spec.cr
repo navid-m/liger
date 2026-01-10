@@ -10,11 +10,8 @@ describe LSP::TextDocument do
         "def hello_world\n  puts \"Hello\"\nend"
       )
 
-      # Word "hello_world"
       word = doc.get_word_at_position(LSP::Position.new(0, 5))
       word.should eq("hello_world")
-
-      # Word "puts"
       word = doc.get_word_at_position(LSP::Position.new(1, 3))
       word.should eq("puts")
     end
@@ -27,7 +24,6 @@ describe LSP::TextDocument do
         "def test\nend"
       )
 
-      # Position on whitespace
       word = doc.get_word_at_position(LSP::Position.new(0, 3))
       word.should be_nil
     end
@@ -40,11 +36,9 @@ describe LSP::TextDocument do
         "empty? nil! @var"
       )
 
-      # Method with ?
       word = doc.get_word_at_position(LSP::Position.new(0, 2))
       word.should eq("empty?")
 
-      # Method with !
       word = doc.get_word_at_position(LSP::Position.new(0, 8))
       word.should eq("nil!")
     end
@@ -73,7 +67,6 @@ describe LSP::TextDocument do
         "line 1\nline 2\nline 3"
       )
 
-      # Replace "line 2" with "modified"
       range = LSP::Range.new(
         LSP::Position.new(1, 0),
         LSP::Position.new(1, 6)
