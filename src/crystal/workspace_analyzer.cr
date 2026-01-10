@@ -128,7 +128,7 @@ module Liger
 
     private def scan_workspace_if_needed
       return unless @workspace_root
-      return if @last_scan_time && (Time.utc - @last_scan_time.not_nil!).total_seconds < 5 # Reduced from 30 to 5 seconds
+      return if @last_scan_time && (Time.utc - @last_scan_time.not_nil!).total_seconds < 5
 
       workspace_path = uri_to_filename(@workspace_root.not_nil!)
       return unless Dir.exists?(workspace_path)
@@ -599,7 +599,11 @@ module Liger
       completions.uniq
     end
 
-    def find_property_definition(property_name : String, current_uri : String, current_source : String) : SymbolInfo?
+    def find_property_definition(
+      property_name : String,
+      current_uri : String,
+      current_source : String,
+    ) : SymbolInfo?
       if symbol = find_property_in_source(current_source, property_name, current_uri)
         return symbol
       end
