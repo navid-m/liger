@@ -21,12 +21,12 @@ module Liger
       rescue ex : ::Crystal::SyntaxException
         line = ex.line_number - 1
         column = ex.column_number - 1
-        
+
         range = LSP::Range.new(
           LSP::Position.new(line, column),
           LSP::Position.new(line, column + 1)
         )
-        
+
         diagnostics << LSP::Diagnostic.new(
           range,
           ex.message || "Syntax error",
@@ -38,7 +38,7 @@ module Liger
           LSP::Position.new(0, 0),
           LSP::Position.new(0, 1)
         )
-        
+
         diagnostics << LSP::Diagnostic.new(
           range,
           "Parse error: #{ex.message}",
@@ -70,7 +70,7 @@ module Liger
       lines = @source.split('\n')
       line = lines[position.line]? || ""
       char = position.character
-      
+
       if char > 0 && line[char - 1]? == '.'
         add_common_methods(items)
       else
@@ -91,17 +91,17 @@ module Liger
         "pointerof", "private", "protected", "require", "rescue", "responds_to?",
         "return", "select", "self", "sizeof", "struct", "super", "then", "true",
         "type", "typeof", "uninitialized", "union", "unless", "until", "verbatim",
-        "when", "while", "with", "yield"
+        "when", "while", "with", "yield",
       ]
 
       spec_keywords = [
         "describe", "context", "it", "pending", "before_each", "after_each",
-        "before_all", "after_all"
+        "before_all", "after_all",
       ]
 
       builtin_methods = [
         "puts", "print", "p", "pp", "gets", "raise", "abort", "exit",
-        "sleep", "spawn", "at_exit", "loop", "caller", "system"
+        "sleep", "spawn", "at_exit", "loop", "caller", "system",
       ]
 
       keywords.each do |keyword|
@@ -133,7 +133,7 @@ module Liger
       types = [
         "String", "Int32", "Int64", "Float64", "Bool", "Array", "Hash",
         "Nil", "Symbol", "Char", "Tuple", "NamedTuple", "Range", "Regex",
-        "Time", "JSON", "YAML", "File", "Dir", "Process", "Channel"
+        "Time", "JSON", "YAML", "File", "Dir", "Process", "Channel",
       ]
 
       types.each do |type|
@@ -258,18 +258,27 @@ module Liger
       end
     end
 
-    private def add_class_symbol(node : ::Crystal::ClassDef, symbols : Array(LSP::DocumentSymbol))
+    private def add_class_symbol(
+      node : ::Crystal::ClassDef,
+      symbols : Array(LSP::DocumentSymbol),
+    )
       location = node.location
       return unless location
 
       start_pos = LSP::Position.new(location.line_number - 1, location.column_number - 1)
       end_location = node.end_location
-      end_pos = end_location ? 
-        LSP::Position.new(end_location.line_number - 1, end_location.column_number - 1) :
-        LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size)
+      end_pos = end_location ? LSP::Position.new(
+        end_location.line_number - 1,
+        end_location.column_number - 1) : LSP::Position.new(
+        start_pos.line,
+        start_pos.character + node.name.to_s.size
+      )
 
       range = LSP::Range.new(start_pos, end_pos)
-      selection_range = LSP::Range.new(start_pos, LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size))
+      selection_range = LSP::Range.new(
+        start_pos,
+        LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size)
+      )
 
       symbol = LSP::DocumentSymbol.new(
         node.name.to_s,
@@ -290,9 +299,7 @@ module Liger
 
       start_pos = LSP::Position.new(location.line_number - 1, location.column_number - 1)
       end_location = node.end_location
-      end_pos = end_location ? 
-        LSP::Position.new(end_location.line_number - 1, end_location.column_number - 1) :
-        LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size)
+      end_pos = end_location ? LSP::Position.new(end_location.line_number - 1, end_location.column_number - 1) : LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size)
 
       range = LSP::Range.new(start_pos, end_pos)
       selection_range = LSP::Range.new(start_pos, LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size))
@@ -317,9 +324,7 @@ module Liger
 
       start_pos = LSP::Position.new(location.line_number - 1, location.column_number - 1)
       end_location = node.end_location
-      end_pos = end_location ? 
-        LSP::Position.new(end_location.line_number - 1, end_location.column_number - 1) :
-        LSP::Position.new(start_pos.line, start_pos.character + node.name.size)
+      end_pos = end_location ? LSP::Position.new(end_location.line_number - 1, end_location.column_number - 1) : LSP::Position.new(start_pos.line, start_pos.character + node.name.size)
 
       range = LSP::Range.new(start_pos, end_pos)
       selection_range = LSP::Range.new(start_pos, LSP::Position.new(start_pos.line, start_pos.character + node.name.size))
