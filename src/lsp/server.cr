@@ -54,7 +54,7 @@ module LSP
     # Handle an initialize request
     private def handle_initialize(params : JSON::Any?) : JSON::Any
       STDERR.puts "Handling initialize request"
-      
+
       if params
         root_uri = params["rootUri"]?.try(&.as_s?)
         @workspace_root = root_uri
@@ -62,22 +62,22 @@ module LSP
       end
 
       capabilities = {
-        "textDocumentSync" => 1,
-        "hoverProvider" => true,
+        "textDocumentSync"   => 1,
+        "hoverProvider"      => true,
         "completionProvider" => {
           "triggerCharacters" => [".", ":", "@"],
-          "resolveProvider" => false
+          "resolveProvider"   => false,
         },
         "signatureHelpProvider" => {
-          "triggerCharacters" => ["(", ","]
+          "triggerCharacters" => ["(", ","],
         },
-        "definitionProvider" => true,
-        "referencesProvider" => true,
-        "documentSymbolProvider" => true,
+        "definitionProvider"      => true,
+        "referencesProvider"      => true,
+        "documentSymbolProvider"  => true,
         "workspaceSymbolProvider" => true,
-        "renameProvider" => {
-          "prepareProvider" => true
-        }
+        "renameProvider"          => {
+          "prepareProvider" => true,
+        },
       }
 
       result = {
@@ -131,7 +131,7 @@ module LSP
       doc = did_change.text_document
 
       @document_manager.change(doc.uri, doc.version, did_change.content_changes)
-      
+
       if text_doc = @document_manager.get(doc.uri)
         @semantic_analyzer.update_source(doc.uri, text_doc.text)
       end
