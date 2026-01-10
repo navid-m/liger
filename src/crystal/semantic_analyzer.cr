@@ -802,10 +802,7 @@ module Liger
     end
 
     private def add_workspace_symbol_completions(items : Array(LSP::CompletionItem))
-      # Add symbols from workspace analysis
       if symbol = @workspace_analyzer.find_symbol_info("")
-        # This is a simplified approach - in practice you'd want to get all symbols
-        # and filter them appropriately
       end
     end
 
