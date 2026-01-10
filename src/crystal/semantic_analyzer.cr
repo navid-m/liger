@@ -635,7 +635,11 @@ module Liger
       end
     end
 
-    private def find_variable_type_in_source(source : String, var_name : String, current_line : Int32) : String?
+    private def find_variable_type_in_source(
+      source : String,
+      var_name : String,
+      current_line : Int32,
+    ) : String?
       lines = source.split('\n')
 
       (0...current_line).reverse_each do |line_num|
@@ -685,7 +689,11 @@ module Liger
       "Object"
     end
 
-    private def find_definition_in_current_file(source : String, symbol_name : String, uri : String) : LSP::Location?
+    private def find_definition_in_current_file(
+      source : String,
+      symbol_name : String,
+      uri : String,
+    ) : LSP::Location?
       lines = source.split('\n')
 
       lines.each_with_index do |line, line_num|
