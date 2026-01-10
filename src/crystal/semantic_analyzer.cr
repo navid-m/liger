@@ -304,7 +304,6 @@ module Liger
           end
         else
           STDERR.puts "No receiver type found, trying variable inference"
-          # Try to infer receiver type from variable assignments
           if receiver_type = find_variable_type_in_source(source, receiver, position.line)
             STDERR.puts "Inferred receiver type: #{receiver_type}"
             completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
