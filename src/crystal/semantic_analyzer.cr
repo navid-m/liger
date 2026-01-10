@@ -474,11 +474,11 @@ module Liger
         filename = filename[1..]
       end
 
-      filename.gsub('/', '\\')
+      filename.gsub('/', File::SEPARATOR)
     end
 
     private def filename_to_uri(filename : String) : String
-      path = filename.gsub('\\', '/')
+      path = filename.gsub(File::SEPARATOR, '/')
 
       if path =~ /^([a-zA-Z]):/
         drive = path[0].to_s
