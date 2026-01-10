@@ -46,11 +46,17 @@ module Liger
     def find_symbol_info(symbol_name : String) : SymbolInfo?
       # Force a fresh scan to ensure we have the latest symbols
       scan_workspace_if_needed
+      
+      STDERR.puts "Looking for symbol: '#{symbol_name}'"
+      STDERR.puts "Symbol cache has #{@symbol_cache.size} files with #{@symbol_cache.values.sum(&.size)} total symbols"
 
       # First try exact match
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
-          return symbol if symbol.name == symbol_name
+          if symbol.name == symbol_name
+            STDERR.puts "Found exact match: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+            return symbol
+          end
         end
       end
 
@@ -59,11 +65,13 @@ module Liger
         symbols.each do |symbol|
           # Check if the symbol name ends with our search term (for namespaced types)
           if symbol.name.ends_with?("::#{symbol_name}") || symbol.name.ends_with?(symbol_name)
+            STDERR.puts "Found partial match: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
             return symbol
           end
         end
       end
-
+      
+      STDERR.puts "No symbol found for: '#{symbol_name}'"
       nil
     end
 

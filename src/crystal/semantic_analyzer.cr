@@ -26,6 +26,16 @@ module Liger
       end
     end
 
+    def workspace_root=(root : String?)
+      @workspace_root = root
+      @workspace_analyzer = WorkspaceAnalyzer.new(root)
+      if root
+        workspace_path = uri_to_filename(root)
+        @cache_dir = File.join(workspace_path, ".liger-cache")
+        Dir.mkdir_p(@cache_dir.not_nil!) unless Dir.exists?(@cache_dir.not_nil!)
+      end
+    end
+
     def update_source(uri : String, source : String)
       @sources[uri] = source
       @workspace_analyzer.update_source(uri, source)
