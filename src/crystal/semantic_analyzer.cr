@@ -345,7 +345,9 @@ module Liger
 
           context_output = output_io.to_s
 
-          if !context_output.empty? && !context_output.includes?("Error") && !context_output.includes?("Usage:")
+          if !context_output.empty? &&
+             !context_output.includes?("Error") &&
+             !context_output.includes?("Usage:")
             add_type_aware_completions(items, context_output)
           end
         rescue
