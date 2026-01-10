@@ -698,7 +698,14 @@ module Liger
       return nil unless word
 
       if signature = find_signature_in_current_file(source, word)
-        content = "```crystal\n#{signature}\n```"
+        if signature.includes?("\n\n")
+          parts = signature.split("\n\n", 2)
+          sig_part = parts[0]
+          doc_part = parts[1]
+          content = "```crystal\n#{sig_part}\n```\n\n---\n\n#{doc_part}"
+        else
+          content = "```crystal\n#{signature}\n```"
+        end
         return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
       end
 
@@ -730,6 +737,10 @@ module Liger
                     "```crystal\n#{symbol.name} : #{symbol.type}\n```"
                   end
 
+        if doc = symbol.documentation
+          content += "\n\n---\n\n#{doc}"
+        end
+
         return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
       end
 
@@ -758,10 +769,30 @@ module Liger
               break if next_line.includes?(")")
               break if i > line_num + 5
             end
-            return full_signature
+            signature = full_signature
           end
 
-          return signature
+          docs = [] of String
+          current_line = line_num - 1
+
+          while current_line >= 0
+            doc_line = lines[current_line].strip
+            if doc_line.starts_with?("#")
+              docs.unshift(doc_line.sub(/^#\s?/, ""))
+              current_line -= 1
+            elsif doc_line.empty?
+              current_line -= 1
+            else
+              break
+            end
+          end
+
+          result = signature
+          if !docs.empty?
+            result += "\n\n" + docs.join("\n")
+          end
+
+          return result
         end
 
         if match = line.match(/^\s*(class\s+#{Regex.escape(method_name)}(?:\s*<\s*\w+)?)/)
