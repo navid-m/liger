@@ -55,7 +55,10 @@ module Liger
     end
 
     # Find references to symbol at position
-    def find_references(position : LSP::Position, include_declaration : Bool = false) : Array(LSP::Location)
+    def find_references(
+      position : LSP::Position,
+      include_declaration : Bool = false,
+    ) : Array(LSP::Location)
       [] of LSP::Location
     end
 
@@ -201,7 +204,10 @@ module Liger
       end
     end
 
-    private def extract_completions(node : ::Crystal::ASTNode, items : Array(LSP::CompletionItem))
+    private def extract_completions(
+      node : ::Crystal::ASTNode,
+      items : Array(LSP::CompletionItem),
+    )
       case node
       when ::Crystal::ClassDef
         items << LSP::CompletionItem.new(
@@ -299,10 +305,14 @@ module Liger
 
       start_pos = LSP::Position.new(location.line_number - 1, location.column_number - 1)
       end_location = node.end_location
-      end_pos = end_location ? LSP::Position.new(end_location.line_number - 1, end_location.column_number - 1) : LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size)
+      end_pos = end_location ? LSP::Position.new(
+        end_location.line_number - 1, end_location.column_number - 1) : LSP::Position.new(
+        start_pos.line, start_pos.character + node.name.to_s.size)
 
       range = LSP::Range.new(start_pos, end_pos)
-      selection_range = LSP::Range.new(start_pos, LSP::Position.new(start_pos.line, start_pos.character + node.name.to_s.size))
+      selection_range = LSP::Range.new(start_pos, LSP::Position.new(
+        start_pos.line, start_pos.character + node.name.to_s.size)
+      )
 
       symbol = LSP::DocumentSymbol.new(
         node.name.to_s,
@@ -324,10 +334,19 @@ module Liger
 
       start_pos = LSP::Position.new(location.line_number - 1, location.column_number - 1)
       end_location = node.end_location
-      end_pos = end_location ? LSP::Position.new(end_location.line_number - 1, end_location.column_number - 1) : LSP::Position.new(start_pos.line, start_pos.character + node.name.size)
+      end_pos = end_location ? LSP::Position.new(
+        end_location.line_number - 1, end_location.column_number - 1) : LSP::Position.new(
+        start_pos.line,
+        start_pos.character + node.name.size)
 
       range = LSP::Range.new(start_pos, end_pos)
-      selection_range = LSP::Range.new(start_pos, LSP::Position.new(start_pos.line, start_pos.character + node.name.size))
+      selection_range = LSP::Range.new(
+        start_pos,
+        LSP::Position.new(
+          start_pos.line,
+          start_pos.character + node.name.size
+        )
+      )
 
       symbols << LSP::DocumentSymbol.new(
         node.name,
