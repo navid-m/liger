@@ -568,7 +568,11 @@ module Liger
       end
     end
 
-    private def add_type_specific_completions(items : Array(LSP::CompletionItem), type_name : String, partial : String)
+    private def add_type_specific_completions(
+      items : Array(LSP::CompletionItem),
+      type_name : String,
+      partial : String,
+    )
       case type_name
       when "String"
         string_methods = [
