@@ -122,19 +122,13 @@ module Liger
         return location
       end
 
-      word = extract_word_at_position(line_text, position.character)
+      word = extract_qualified_name_at_position(line_text, position.character)
+
       return nil unless word
 
       {% if flag?(:debug) %}
         STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}"
       {% end %}
-
-      if location = find_definition_in_current_file(source, word, uri)
-        {% if flag?(:debug) %}
-          STDERR.puts "Found definition in current file"
-        {% end %}
-        return location
-      end
 
       if symbol = @workspace_analyzer.find_symbol_info(word)
         {% if flag?(:debug) %}
@@ -146,6 +140,28 @@ module Liger
           LSP::Position.new(symbol.line, word.size)
         )
         return LSP::Location.new(def_uri, range)
+      end
+
+      base_name = word.split("::").last
+      if base_name != word
+        if symbol = @workspace_analyzer.find_symbol_info(base_name)
+          {% if flag?(:debug) %}
+            STDERR.puts "Found symbol by base name: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+          {% end %}
+          def_uri = filename_to_uri(symbol.file)
+          range = LSP::Range.new(
+            LSP::Position.new(symbol.line, 0),
+            LSP::Position.new(symbol.line, base_name.size)
+          )
+          return LSP::Location.new(def_uri, range)
+        end
+      end
+
+      if location = find_definition_in_current_file(source, word, uri)
+        {% if flag?(:debug) %}
+          STDERR.puts "Found definition in current file"
+        {% end %}
+        return location
       end
 
       if word.starts_with?("@")
@@ -596,6 +612,7 @@ module Liger
         path = "#{drive}%3A#{rest}"
       end
 
+      path = path.lstrip('/')
       "file:///#{path}"
     end
 
@@ -687,6 +704,44 @@ module Liger
       end_pos = char
       while end_pos < line.size && word_char?(line[end_pos])
         end_pos += 1
+      end
+
+      return nil if start_pos == end_pos
+      word = line[start_pos...end_pos]
+
+      if word.ends_with?('?') || word.ends_with?('!')
+        word = word[0...-1]
+      end
+
+      return nil if word.empty?
+      word
+    end
+
+    private def extract_qualified_name_at_position(line : String, char : Int32) : String?
+      return nil if char < 0 || char > line.size
+
+      start_pos = char
+      while start_pos > 0
+        prev_char = line[start_pos - 1]
+        if word_char?(prev_char)
+          start_pos -= 1
+        elsif prev_char == ':' && start_pos >= 2 && line[start_pos - 2] == ':'
+          start_pos -= 2
+        else
+          break
+        end
+      end
+
+      end_pos = char
+      while end_pos < line.size
+        curr_char = line[end_pos]
+        if word_char?(curr_char)
+          end_pos += 1
+        elsif curr_char == ':' && end_pos + 1 < line.size && line[end_pos + 1] == ':'
+          end_pos += 2
+        else
+          break
+        end
       end
 
       return nil if start_pos == end_pos

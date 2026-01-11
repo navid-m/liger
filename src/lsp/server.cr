@@ -223,7 +223,9 @@ module LSP
       return JSON.parse("null") unless doc
 
       if location = @semantic_analyzer.find_definition(doc.uri, def_params.position)
-        return JSON.parse(location.to_json)
+        json_result = location.to_json
+        File.write("/tmp/liger_logs.log", "Returning location JSON: #{json_result}\n", mode: "a")
+        return JSON.parse(json_result)
       end
 
       JSON.parse("null")

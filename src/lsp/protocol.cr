@@ -27,6 +27,8 @@ module LSP
     include JSON::Serializable
 
     property start : Position
+    
+    @[JSON::Field(key: "end")]
     property ending : Position
 
     def initialize(@start : Position, @ending : Position)

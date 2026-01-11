@@ -167,13 +167,13 @@ module Liger
     def find_symbol_info(symbol_name : String) : SymbolInfo?
       scan_workspace_if_needed
 
-      STDERR.puts "Looking for symbol: '#{symbol_name}'"
-      STDERR.puts "Symbol cache has #{@symbol_cache.size} files with #{@symbol_cache.values.sum(&.size)} total symbols"
+      if @symbol_cache.values.first?
+        sample = @symbol_cache.values.first.first(10).map(&.name).join(", ")
+      end
 
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name == symbol_name
-            STDERR.puts "Found exact match in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
             return symbol
           end
         end
@@ -182,7 +182,6 @@ module Liger
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name.ends_with?("::#{symbol_name}")
-            STDERR.puts "Found partial match in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
             return symbol
           end
         end
@@ -190,10 +189,14 @@ module Liger
 
       scan_stdlib_if_needed
 
+      if @stdlib_cache.values.first?
+        sample = @stdlib_cache.values.first.first(10).map(&.name).join(", ")
+      end
+
       @stdlib_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name == symbol_name
-            STDERR.puts "Found exact match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+            File.write("/tmp/liger_logs.log", "Found exact match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}\n", mode: "a")
             return symbol
           end
         end
@@ -202,13 +205,13 @@ module Liger
       @stdlib_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name.ends_with?("::#{symbol_name}")
-            STDERR.puts "Found partial match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+            File.write("/tmp/liger_logs.log", "Found partial match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}\n", mode: "a")
             return symbol
           end
         end
       end
 
-      STDERR.puts "No symbol found for: '#{symbol_name}'"
+      File.write("/tmp/liger_logs.log", "No symbol found for: '#{symbol_name}'\n", mode: "a")
       nil
     end
 
