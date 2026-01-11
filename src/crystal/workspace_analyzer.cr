@@ -6,7 +6,9 @@ module Liger
     @workspace_root : String?
     @file_cache = Hash(String, String).new
     @symbol_cache = Hash(String, Array(SymbolInfo)).new
+    @stdlib_cache = Hash(String, Array(SymbolInfo)).new
     @last_scan_time : Time?
+    @stdlib_scanned = false
 
     struct SymbolInfo
       property name : String
@@ -57,7 +59,7 @@ module Liger
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name == symbol_name
-            STDERR.puts "Found exact match: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+            STDERR.puts "Found exact match in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
             return symbol
           end
         end
@@ -66,7 +68,27 @@ module Liger
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name.ends_with?("::#{symbol_name}") || symbol.name.ends_with?(symbol_name)
-            STDERR.puts "Found partial match: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+            STDERR.puts "Found partial match in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+            return symbol
+          end
+        end
+      end
+
+      scan_stdlib_if_needed
+
+      @stdlib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.name == symbol_name
+            STDERR.puts "Found exact match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+            return symbol
+          end
+        end
+      end
+
+      @stdlib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.name.ends_with?("::#{symbol_name}") || symbol.name.ends_with?(symbol_name)
+            STDERR.puts "Found partial match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
             return symbol
           end
         end
@@ -144,8 +166,117 @@ module Liger
       STDERR.puts "Scanning workspace: #{workspace_path}"
       @symbol_cache.clear
       scan_directory(workspace_path)
+
       @last_scan_time = Time.utc
       STDERR.puts "Workspace scan complete. Found #{@symbol_cache.values.sum(&.size)} symbols"
+    end
+
+    private def scan_stdlib_if_needed
+      return if @stdlib_scanned
+
+      STDERR.puts "Lazy loading Crystal stdlib..."
+      scan_stdlib
+      @stdlib_scanned = true
+    end
+
+    private def scan_stdlib
+      stdlib_path = detect_crystal_stdlib_path
+
+      if stdlib_path && Dir.exists?(stdlib_path)
+        STDERR.puts "Scanning Crystal stdlib: #{stdlib_path}"
+        scan_stdlib_directory(stdlib_path, 0)
+        return
+      end
+
+      stdlib_paths = [
+        "/usr/share/crystal/src",
+        "/usr/local/share/crystal/src",
+        "/opt/crystal/src",
+      ]
+
+      stdlib_paths.each do |path|
+        if Dir.exists?(path)
+          STDERR.puts "Scanning Crystal stdlib: #{path}"
+          scan_stdlib_directory(path, 0)
+          break
+        end
+      end
+
+      STDERR.puts "Stdlib scan complete. Found #{@stdlib_cache.values.sum(&.size)} stdlib symbols"
+    end
+
+    private def scan_stdlib_directory(path : String, depth : Int32)
+      return if depth > 2
+
+      Dir.each_child(path) do |entry|
+        full_path = File.join(path, entry)
+
+        if Dir.exists?(full_path)
+          next if entry.starts_with?('.') || entry == "llvm" || entry == "crystal" || entry == "compiler"
+          scan_stdlib_directory(full_path, depth + 1)
+        elsif entry.ends_with?(".cr")
+          scan_stdlib_file(full_path)
+        end
+      end
+    end
+
+    private def scan_stdlib_file(file_path : String)
+      return unless File.exists?(file_path)
+
+      content = File.read(file_path)
+      symbols = [] of SymbolInfo
+      lines = content.split('\n')
+      current_namespace = [] of String
+
+      lines.each_with_index do |line, line_num|
+        if match = line.match(/^\s*class\s+(\w+)(?:\s*<\s*(\w+))?/)
+          class_name = match[1]
+          parent_class = match[2]? || "Object"
+          full_name = (current_namespace + [class_name]).join("::")
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(class_name, parent_class, "class", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.any?
+          current_namespace.push(class_name)
+        elsif match = line.match(/^\s*module\s+(\w+)/)
+          module_name = match[1]
+          full_name = (current_namespace + [module_name]).join("::")
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(module_name, "Module", "module", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
+          current_namespace.push(module_name)
+        elsif line.match(/^\s*end\s*$/)
+          current_namespace.pop if current_namespace.any?
+        elsif match = line.match(/^\s*def\s+(\w+)(?:\([^)]*\))?\s*:\s*(\w+)/)
+          # Only scan public methods
+          method_name = match[1]
+          return_type = match[2]
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(method_name, return_type, "method", file_path, line_num, line.strip, doc)
+        end
+      end
+
+      @stdlib_cache[file_path] = symbols
+    end
+
+    private def detect_crystal_stdlib_path : String?
+      begin
+        output = IO::Memory.new
+        Process.run("crystal", ["env", "CRYSTAL_PATH"], output: output)
+        crystal_path = output.to_s.strip
+
+        paths = crystal_path.split({% if flag?(:windows) %} ';' {% else %} ':' {% end %})
+
+        paths.each do |path|
+          if path.ends_with?("/src") || path.ends_with?("\\src")
+            if File.exists?(File.join(path, "prelude.cr")) || File.exists?(File.join(path, "object.cr"))
+              return path
+            end
+          end
+        end
+      rescue
+      end
+
+      nil
     end
 
     private def scan_directory(path : String)
