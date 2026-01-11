@@ -371,7 +371,6 @@ module Liger
 
         begin
           cursor_loc = "#{filename}:#{line_num}:#{col_num}"
-
           output_io = IO::Memory.new
           error_io = IO::Memory.new
 
