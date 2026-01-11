@@ -9,7 +9,6 @@ module Liger
     property workspace_root : String?
     property enable_semantic_hover : Bool = true
     property enable_type_aware_completion : Bool = true
-    property enable_debug_logging : Bool = false
 
     @sources = Hash(String, String).new
     @source_lines_cache = Hash(String, Array(String)).new
@@ -126,15 +125,21 @@ module Liger
       word = extract_word_at_position(line_text, position.character)
       return nil unless word
 
-      STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}" if @enable_debug_logging
+      {% if flag?(:debug) %}
+        STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}"
+      {% end %}
 
       if location = find_definition_in_current_file(source, word, uri)
-        STDERR.puts "Found definition in current file" if @enable_debug_logging
+        {% if flag?(:debug) %}
+          STDERR.puts "Found definition in current file"
+        {% end %}
         return location
       end
 
       if symbol = @workspace_analyzer.find_symbol_info(word)
-        STDERR.puts "Found symbol in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}" if @enable_debug_logging
+        {% if flag?(:debug) %}
+          STDERR.puts "Found symbol in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+        {% end %}
         def_uri = filename_to_uri(symbol.file)
         range = LSP::Range.new(
           LSP::Position.new(symbol.line, 0),
@@ -300,7 +305,9 @@ module Liger
           return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
         end
       rescue ex
-        STDERR.puts "Error getting hover info: #{ex.message}" if @enable_debug_logging
+        {% if flag?(:debug) %}
+          STDERR.puts "Error getting hover info: #{ex.message}"
+        {% end %}
       end
 
       word = extract_word_at_position(line_text, position.character)
@@ -397,7 +404,9 @@ module Liger
         add_workspace_symbol_completions(items)
       end
 
-      STDERR.puts "Returning #{items.size} completion items" if @enable_debug_logging
+      {% if flag?(:debug) %}
+        STDERR.puts "Returning #{items.size} completion items"
+      {% end %}
       items
     end
 
