@@ -267,7 +267,12 @@ module LSP
     property selection_range : Range
     property? children : Array(DocumentSymbol)?
 
-    def initialize(@name : String, @kind : SymbolKind, @range : Range, @selection_range : Range)
+    def initialize(
+      @name : String,
+      @kind : SymbolKind,
+      @range : Range,
+      @selection_range : Range,
+    )
     end
   end
 
