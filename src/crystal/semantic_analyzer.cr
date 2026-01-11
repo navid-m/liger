@@ -321,6 +321,56 @@ module Liger
     end
 
     def signature_help(uri : String, position : LSP::Position) : LSP::SignatureHelp?
+      source = @sources[uri]?
+      return nil unless source
+
+      lines = get_lines(uri)
+      return nil unless lines
+      return nil if position.line >= lines.size
+
+      line_text = lines[position.line]
+      prefix = line_text[0...position.character]
+
+      if match = prefix.match(/(\w+)\s*\([^)]*$/)
+        method_name = match[1]
+
+        if signature = find_method_signature(source, method_name)
+          signature_info = LSP::SignatureInformation.new(
+            signature,
+            nil
+          )
+
+          paren_start = match.begin(0).not_nil! + match[1].size
+          text_after_paren = prefix[paren_start..-1]
+          param_index = text_after_paren.count(',')
+
+          return LSP::SignatureHelp.new(
+            [signature_info],
+            0,
+            param_index
+          )
+        end
+
+        if symbol = @workspace_analyzer.find_symbol_info(method_name)
+          if sig = symbol.signature
+            signature_info = LSP::SignatureInformation.new(
+              sig,
+              symbol.documentation
+            )
+
+            paren_start = match.begin(0).not_nil! + match[1].size
+            text_after_paren = prefix[paren_start..-1]
+            param_index = text_after_paren.count(',')
+
+            return LSP::SignatureHelp.new(
+              [signature_info],
+              0,
+              param_index
+            )
+          end
+        end
+      end
+
       nil
     end
 
@@ -395,6 +445,11 @@ module Liger
           rescue
           end
         end
+      elsif match = prefix.match(/([\w:]+)::([\w]*)$/)
+        namespace = match[1]
+        partial = match[2]
+
+        add_namespace_completions(items, namespace, partial, source)
       elsif prefix =~ /::/
         add_type_completions(items)
       else
@@ -905,6 +960,108 @@ module Liger
           end
         end
       end
+    end
+
+    private def add_namespace_completions(
+      items : Array(LSP::CompletionItem),
+      namespace : String,
+      partial : String,
+      source : String,
+    )
+      symbols = @workspace_analyzer.find_symbols_in_namespace(namespace)
+
+      symbols.each do |symbol|
+        if symbol.name.starts_with?(partial)
+          kind = case symbol.kind
+                 when "class"
+                   LSP::CompletionItemKind::Class
+                 when "module"
+                   LSP::CompletionItemKind::Module
+                 when "method"
+                   LSP::CompletionItemKind::Method
+                 when "constant"
+                   LSP::CompletionItemKind::Constant
+                 else
+                   LSP::CompletionItemKind::Variable
+                 end
+
+          items << LSP::CompletionItem.new(
+            symbol.name,
+            kind,
+            "#{namespace}::#{symbol.name}"
+          )
+        end
+      end
+
+      lines = get_lines("")
+      if lines.nil?
+        lines = source.split('\n')
+      end
+
+      in_namespace = false
+      nesting_level = 0
+
+      lines.each do |line|
+        if line.match(/^\s*(module|class)\s+#{Regex.escape(namespace)}\b/)
+          in_namespace = true
+          nesting_level = 0
+          next
+        end
+
+        if in_namespace
+          nesting_level += 1 if line =~ /^\s*(module|class|def|if|case|while|until|begin)\b/
+          nesting_level -= 1 if line =~ /^\s*end\b/
+
+          if nesting_level < 0
+            in_namespace = false
+            next
+          end
+
+          if match = line.match(/^\s*(def|class|module|struct|enum)\s+(\w+)/)
+            symbol_name = match[2]
+            if symbol_name.starts_with?(partial)
+              kind = case match[1]
+                     when "class"
+                       LSP::CompletionItemKind::Class
+                     when "module"
+                       LSP::CompletionItemKind::Module
+                     when "def"
+                       LSP::CompletionItemKind::Method
+                     when "struct"
+                       LSP::CompletionItemKind::Struct
+                     when "enum"
+                       LSP::CompletionItemKind::Enum
+                     else
+                       LSP::CompletionItemKind::Variable
+                     end
+
+              items << LSP::CompletionItem.new(
+                symbol_name,
+                kind,
+                "#{namespace}::#{symbol_name}"
+              )
+            end
+          end
+        end
+      end
+    end
+
+    private def find_method_signature(source : String, method_name : String) : String?
+      lines = @source_lines_cache.values.first? || source.split('\n')
+
+      lines.each do |line|
+        if match = line.match(/^\s*def\s+#{Regex.escape(method_name)}\s*(\([^)]*\))?(?:\s*:\s*(\w+))?/)
+          params = match[1]? || "()"
+          return_type = match[2]? || ""
+
+          signature = "def #{method_name}#{params}"
+          signature += " : #{return_type}" unless return_type.empty?
+
+          return signature
+        end
+      end
+
+      nil
     end
 
     private def find_variable_type_in_source(

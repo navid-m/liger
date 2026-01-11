@@ -321,7 +321,7 @@ module LSP
     property documentation : String | MarkupContent | Nil
     property? parameters : Array(ParameterInformation)?
 
-    def initialize(@label : String)
+    def initialize(@label : String, @documentation : String | MarkupContent | Nil = nil)
     end
   end
 
@@ -344,7 +344,11 @@ module LSP
     property? active_signature : Int32?
     property? active_parameter : Int32?
 
-    def initialize(@signatures : Array(SignatureInformation))
+    def initialize(
+      @signatures : Array(SignatureInformation),
+      @active_signature : Int32? = nil,
+      @active_parameter : Int32? = nil
+    )
     end
   end
 

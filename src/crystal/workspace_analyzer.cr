@@ -211,6 +211,42 @@ module Liger
       STDERR.puts "No symbol found for: '#{symbol_name}'"
       nil
     end
+    
+    def find_symbols_in_namespace(namespace : String) : Array(SymbolInfo)
+      scan_workspace_if_needed
+      
+      results = [] of SymbolInfo
+      search_pattern = "#{namespace}::"
+      
+      # Search workspace symbols
+      @symbol_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          # Match symbols that start with namespace::
+          if symbol.name.starts_with?(search_pattern)
+            # Extract just the immediate child (not nested)
+            remainder = symbol.name[search_pattern.size..-1]
+            unless remainder.includes?("::")
+              results << symbol
+            end
+          end
+        end
+      end
+      
+      # Also search stdlib
+      scan_stdlib_if_needed
+      @stdlib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.name.starts_with?(search_pattern)
+            remainder = symbol.name[search_pattern.size..-1]
+            unless remainder.includes?("::")
+              results << symbol
+            end
+          end
+        end
+      end
+      
+      results.uniq { |s| s.name }
+    end
 
     def find_method_info(receiver_type : String, method_name : String) : SymbolInfo?
       scan_workspace_if_needed
