@@ -924,7 +924,6 @@ module Liger
     def get_completions_for_receiver(receiver_type : String) : Array(String)
       completions = [] of String
 
-      # Check for LSP protocol types first
       case receiver_type
       when "TextDocumentPositionParams"
         completions = ["text_document", "position"]
@@ -944,7 +943,6 @@ module Liger
         completions = ["kind", "value"]
       when "Diagnostic"
         completions = ["range", "severity", "code", "source", "message"]
-        # Class types (for class methods)
       when "TextDocumentManager", "SemanticAnalyzer", "WorkspaceAnalyzer", "CrystalParser"
         completions = ["new"]
       when "String"
