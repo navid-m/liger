@@ -9,8 +9,10 @@ module Liger
     property workspace_root : String?
     property enable_semantic_hover : Bool = true
     property enable_type_aware_completion : Bool = true
+    property enable_debug_logging : Bool = false
 
     @sources = Hash(String, String).new
+    @source_lines_cache = Hash(String, Array(String)).new
     @last_saved_hashes = Hash(String, UInt64).new
     @cache_dir : String?
     @main_file_cache : String?
@@ -38,12 +40,28 @@ module Liger
 
     def update_source(uri : String, source : String)
       @sources[uri] = source
+      @source_lines_cache[uri] = source.split('\n')
       @workspace_analyzer.update_source(uri, source)
       @workspace_analyzer.force_scan
     end
 
     def remove_source(uri : String)
       @sources.delete(uri)
+      @source_lines_cache.delete(uri)
+    end
+
+    private def get_lines(uri : String) : Array(String)?
+      if lines = @source_lines_cache[uri]?
+        return lines
+      end
+
+      if source = @sources[uri]?
+        lines = source.split('\n')
+        @source_lines_cache[uri] = lines
+        return lines
+      end
+
+      nil
     end
 
     def analyze(uri : String) : Array(LSP::Diagnostic)
@@ -90,13 +108,9 @@ module Liger
 
     def find_definition(uri : String, position : LSP::Position) : LSP::Location?
       source = @sources[uri]?
-      File.write("/tmp/liger_logs.log", "find_definition: source is nil\n", mode: "a") unless source
       return nil unless source
-
-      lines = source.split('\n')
-      File.write(
-        "/tmp/liger_logs.log", "find_definition: position.line #{position.line} >= lines.size #{lines.size}\n", mode: "a"
-      ) if position.line >= lines.size
+      lines = get_lines(uri)
+      return nil unless lines
       return nil if position.line >= lines.size
 
       line_text = lines[position.line]
@@ -110,22 +124,17 @@ module Liger
       end
 
       word = extract_word_at_position(line_text, position.character)
-      File.write(
-        "/tmp/liger_logs.log", "find_definition: extracted word '#{word}' from line '#{line_text}' at char #{position.character}\n", mode: "a"
-      )
       return nil unless word
 
-      STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}"
+      STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}" if @enable_debug_logging
 
       if location = find_definition_in_current_file(source, word, uri)
-        STDERR.puts "Found definition in current file"
-        File.write("/tmp/liger_logs.log", "find_definition: found in current file\n", mode: "a")
+        STDERR.puts "Found definition in current file" if @enable_debug_logging
         return location
       end
-      File.write("/tmp/liger_logs.log", "find_definition: not found in current file\n", mode: "a")
 
       if symbol = @workspace_analyzer.find_symbol_info(word)
-        STDERR.puts "Found symbol in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
+        STDERR.puts "Found symbol in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}" if @enable_debug_logging
         def_uri = filename_to_uri(symbol.file)
         range = LSP::Range.new(
           LSP::Position.new(symbol.line, 0),
@@ -241,7 +250,8 @@ module Liger
       source = @sources[uri]?
       return nil unless source
 
-      lines = source.split('\n')
+      lines = get_lines(uri)
+      return nil unless lines
       return nil if position.line >= lines.size
 
       line_text = lines[position.line]
@@ -290,7 +300,7 @@ module Liger
           return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
         end
       rescue ex
-        STDERR.puts "Error getting hover info: #{ex.message}"
+        STDERR.puts "Error getting hover info: #{ex.message}" if @enable_debug_logging
       end
 
       word = extract_word_at_position(line_text, position.character)
@@ -313,38 +323,23 @@ module Liger
       source = @sources[uri]?
       return items unless source
 
-      lines = source.split('\n')
+      lines = get_lines(uri)
+      return items unless lines
       return items if position.line >= lines.size
 
       line = lines[position.line]
       prefix = line[0...position.character]
 
-      File.open("/tmp/liger_debug.log", "a") do |f|
-        f.puts "=== COMPLETION DEBUG ==="
-        f.puts "Completion request: line='#{line}', prefix='#{prefix}', pos=#{position.character}"
-        f.puts "Line length: #{line.size}, Position: #{position.character}"
-      end
-
       if match = prefix.match(/([\w@]+)\.([\w]*)$/)
         receiver = match[1]
         partial_method = match[2]
-
-        File.open("/tmp/liger_debug.log", "a") do |f|
-          f.puts "Dot completion detected: receiver='#{receiver}', partial='#{partial_method}'"
-        end
 
         receiver_pos = LSP::Position.new(
           position.line,
           position.character - partial_method.size - 1
         )
         if receiver_type = @workspace_analyzer.get_type_at_position(uri, source, receiver_pos)
-          File.open("/tmp/liger_debug.log", "a") do |f|
-            f.puts "Found receiver type via workspace analyzer: #{receiver_type}"
-          end
           completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
-          File.open("/tmp/liger_debug.log", "a") do |f|
-            f.puts "Available completions: #{completions.inspect}"
-          end
           completions.each do |method_name|
             if method_name.starts_with?(partial_method)
               items << LSP::CompletionItem.new(
@@ -354,56 +349,44 @@ module Liger
               )
             end
           end
-        else
-          File.open("/tmp/liger_debug.log", "a") do |f|
-            f.puts "No receiver type found via workspace analyzer, trying variable inference"
-          end
-          if receiver_type = find_variable_type_in_source(source, receiver, position.line)
-            File.open("/tmp/liger_debug.log", "a") do |f|
-              f.puts "Inferred receiver type: #{receiver_type}"
-            end
-            completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
-            File.open("/tmp/liger_debug.log", "a") do |f|
-              f.puts "Available completions: #{completions.inspect}"
-            end
-            completions.each do |method_name|
-              if method_name.starts_with?(partial_method)
-                items << LSP::CompletionItem.new(
-                  method_name,
-                  LSP::CompletionItemKind::Method,
-                  "#{receiver_type} method"
-                )
-              end
-            end
-          else
-            File.open("/tmp/liger_debug.log", "a") do |f|
-              f.puts "Could not infer receiver type for '#{receiver}'"
+        elsif receiver_type = find_variable_type_in_source(source, receiver, position.line)
+          completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
+          completions.each do |method_name|
+            if method_name.starts_with?(partial_method)
+              items << LSP::CompletionItem.new(
+                method_name,
+                LSP::CompletionItemKind::Method,
+                "#{receiver_type} method"
+              )
             end
           end
         end
 
         add_common_method_completions(items)
-        filename = uri_to_filename(uri)
-        line_num = position.line + 1
-        col_num = position.character - 1
 
-        begin
-          cursor_loc = "#{filename}:#{line_num}:#{col_num}"
-          output_io = IO::Memory.new
-          error_io = IO::Memory.new
+        if items.size < 5 && @enable_type_aware_completion
+          filename = uri_to_filename(uri)
+          line_num = position.line + 1
+          col_num = position.character - 1
 
-          Process.run("crystal", ["tool", "context", "-c", cursor_loc, filename],
-            output: output_io,
-            error: error_io)
+          begin
+            cursor_loc = "#{filename}:#{line_num}:#{col_num}"
+            output_io = IO::Memory.new
+            error_io = IO::Memory.new
 
-          context_output = output_io.to_s
+            Process.run("crystal", ["tool", "context", "-c", cursor_loc, filename],
+              output: output_io,
+              error: error_io)
 
-          if !context_output.empty? &&
-             !context_output.includes?("Error") &&
-             !context_output.includes?("Usage:")
-            add_type_aware_completions(items, context_output)
+            context_output = output_io.to_s
+
+            if !context_output.empty? &&
+               !context_output.includes?("Error") &&
+               !context_output.includes?("Usage:")
+              add_type_aware_completions(items, context_output)
+            end
+          rescue
           end
-        rescue
         end
       elsif prefix =~ /::/
         add_type_completions(items)
@@ -414,7 +397,7 @@ module Liger
         add_workspace_symbol_completions(items)
       end
 
-      STDERR.puts "Returning #{items.size} completion items"
+      STDERR.puts "Returning #{items.size} completion items" if @enable_debug_logging
       items
     end
 
@@ -430,7 +413,8 @@ module Liger
       source = @sources[uri]?
       return nil unless source
 
-      lines = source.split('\n')
+      lines = get_lines(uri)
+      return nil unless lines
       return nil if position.line >= lines.size
 
       line = lines[position.line]
@@ -919,7 +903,8 @@ module Liger
       var_name : String,
       current_line : Int32,
     ) : String?
-      lines = source.split('\n')
+      # Use cached lines if available
+      lines = @source_lines_cache.values.first? || source.split('\n')
 
       (0...current_line).reverse_each do |line_num|
         line = lines[line_num]
@@ -977,7 +962,8 @@ module Liger
       source : String,
       position : LSP::Position,
     ) : LSP::Hover?
-      lines = source.split('\n')
+      lines = get_lines(uri)
+      return nil unless lines
       return nil if position.line >= lines.size
 
       line_text = lines[position.line]
@@ -1052,7 +1038,15 @@ module Liger
     end
 
     private def find_signature_in_current_file(source : String, method_name : String) : String?
-      lines = source.split('\n')
+      lines = nil
+      @source_lines_cache.each_value do |cached_lines|
+        source_from_cache = cached_lines.join('\n')
+        if source_from_cache == source
+          lines = cached_lines
+          break
+        end
+      end
+      lines ||= source.split('\n')
 
       lines.each_with_index do |line, line_num|
         if match = line.match(
@@ -1221,7 +1215,10 @@ module Liger
       symbol_name : String,
       uri : String,
     ) : LSP::Location?
-      lines = source.split('\n')
+      lines = get_lines(uri)
+      unless lines
+        lines = source.split('\n')
+      end
 
       lines.each_with_index do |line, line_num|
         if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*[=:]/)
@@ -1252,7 +1249,6 @@ module Liger
 
         # Struct definitions
         if match = line.match(/^\s*struct\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
-          File.write("/tmp/liger_logs.log", "find_definition_in_current_file: found struct '#{symbol_name}' on line #{line_num}: #{line}\n", mode: "a")
           range = LSP::Range.new(
             LSP::Position.new(line_num, match.begin(1).not_nil!),
             LSP::Position.new(line_num, match.end(1).not_nil!)
@@ -1262,7 +1258,6 @@ module Liger
 
         # Class definitions
         if match = line.match(/^\s*class\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
-          File.write("/tmp/liger_logs.log", "find_definition_in_current_file: found class '#{symbol_name}' on line #{line_num}: #{line}\n", mode: "a")
           range = LSP::Range.new(
             LSP::Position.new(line_num, match.begin(1).not_nil!),
             LSP::Position.new(line_num, match.end(1).not_nil!)
