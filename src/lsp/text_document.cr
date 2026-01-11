@@ -50,7 +50,12 @@ module LSP
     property lines : Array(String)
 
     # Initialize a text document
-    def initialize(@uri : DocumentUri, @language_id : String, @version : Int32, @text : String)
+    def initialize(
+      @uri : DocumentUri,
+      @language_id : String,
+      @version : Int32,
+      @text : String,
+    )
       @lines = @text.split('\n')
     end
 
