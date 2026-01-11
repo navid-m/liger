@@ -1014,7 +1014,6 @@ module Liger
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.kind == "method" && symbol.name == method_name
-            # Check if this method belongs to the receiver type or its hierarchy
             if symbol.type.includes?(receiver_type) || receiver_type.includes?(symbol.type) ||
                is_method_available_for_type(symbol, receiver_type)
               return symbol
