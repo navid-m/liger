@@ -445,8 +445,11 @@ module Liger
         )
 
         if lib_symbol = @workspace_analyzer.find_symbol_info(receiver)
+          STDERR.puts "DEBUG Completion: Found symbol '#{receiver}' with kind '#{lib_symbol.kind}'"
+
           if lib_symbol.kind == "lib"
             lib_functions = @workspace_analyzer.get_lib_functions(receiver)
+            STDERR.puts "DEBUG Completion: Found #{lib_functions.size} lib functions for '#{receiver}'"
             lib_functions.each do |fun_symbol|
               fun_name = fun_symbol.name.split("::").last
               if fun_name.starts_with?(partial_method)
@@ -459,7 +462,38 @@ module Liger
               end
             end
             return items
+          elsif lib_symbol.kind == "class" || lib_symbol.kind == "struct" || lib_symbol.kind == "module"
+            STDERR.puts "DEBUG Completion: Getting methods for '#{receiver}' (#{lib_symbol.kind})"
+            class_members = @workspace_analyzer.get_class_methods_and_properties(receiver)
+            STDERR.puts "DEBUG Completion: Found #{class_members.size} members"
+
+            class_members.each_with_index do |member_symbol, idx|
+              member_name = member_symbol.name.split("::").last
+              member_name = member_name.sub(/^@/, "") if member_name.starts_with?("@")
+
+              if member_name.starts_with?(partial_method)
+                kind = case member_symbol.kind
+                       when "method"
+                         LSP::CompletionItemKind::Method
+                       when "property", "getter", "setter"
+                         LSP::CompletionItemKind::Property
+                       else
+                         LSP::CompletionItemKind::Field
+                       end
+
+                detail = member_symbol.signature || member_symbol.type
+                items << LSP::CompletionItem.new(
+                  member_name,
+                  kind,
+                  detail
+                )
+              end
+            end
+
+            STDERR.puts "DEBUG Completion: Added #{items.size} completion items"
           end
+        else
+          STDERR.puts "DEBUG Completion: No symbol found for receiver '#{receiver}'"
         end
 
         receiver_type = nil

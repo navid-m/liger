@@ -179,6 +179,24 @@ module Liger
 
       is_qualified = symbol_name.includes?("::")
 
+      if symbol_name.includes?("CrystGLFW") || symbol_name == "CrystGLFW"
+        STDERR.puts "DEBUG find_symbol_info: Looking for '#{symbol_name}'"
+        STDERR.puts "DEBUG find_symbol_info: is_qualified = #{is_qualified}"
+
+        module_count = 0
+        @symbol_cache.each_value do |symbols|
+          symbols.each do |symbol|
+            if symbol.kind == "module" && module_count < 5
+              STDERR.puts "DEBUG find_symbol_info: Module in cache: #{symbol.name}"
+              module_count += 1
+            end
+            if symbol.name.includes?("CrystGLFW")
+              STDERR.puts "DEBUG find_symbol_info: Found symbol with CrystGLFW: #{symbol.name} (#{symbol.kind})"
+            end
+          end
+        end
+      end
+
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name == symbol_name
@@ -235,6 +253,32 @@ module Liger
         @stdlib_cache.each_value do |symbols|
           symbols.each do |symbol|
             if symbol.name.ends_with?("::#{base_name}")
+              return symbol
+            end
+          end
+        end
+
+        @lib_cache.each_value do |symbols|
+          symbols.each do |symbol|
+            if symbol.name.ends_with?("::#{base_name}")
+              return symbol
+            end
+          end
+        end
+      end
+
+      @lib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.name == symbol_name
+            return symbol
+          end
+        end
+      end
+
+      if is_qualified
+        @lib_cache.each_value do |symbols|
+          symbols.each do |symbol|
+            if symbol.name == symbol_name || symbol.name.ends_with?("::#{symbol_name}")
               return symbol
             end
           end
@@ -298,6 +342,66 @@ module Liger
           end
         end
       end
+
+      results
+    end
+
+    def get_class_methods_and_properties(class_name : String) : Array(SymbolInfo)
+      scan_workspace_if_needed
+
+      STDERR.puts "DEBUG: get_class_methods_and_properties called for '#{class_name}'"
+
+      results = [] of SymbolInfo
+
+      @symbol_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.name.starts_with?("#{class_name}::")
+            if symbol.kind == "method" ||
+               symbol.kind == "property" ||
+               symbol.kind == "getter" ||
+               symbol.kind == "setter" ||
+               symbol.kind == "instance_variable"
+              STDERR.puts "DEBUG: Found member in workspace cache: #{symbol.name} (#{symbol.kind})"
+              results << symbol
+            end
+          end
+        end
+      end
+
+      STDERR.puts "DEBUG: Found #{results.size} members in workspace cache"
+
+      scan_stdlib_if_needed
+      @stdlib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.name.starts_with?("#{class_name}::")
+            if symbol.kind == "method" ||
+               symbol.kind == "property" ||
+               symbol.kind == "getter" ||
+               symbol.kind == "setter" ||
+               symbol.kind == "instance_variable"
+              STDERR.puts "DEBUG: Found member in stdlib cache: #{symbol.name} (#{symbol.kind})"
+              results << symbol
+            end
+          end
+        end
+      end
+
+      @lib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.name.starts_with?("#{class_name}::")
+            if symbol.kind == "method" ||
+               symbol.kind == "property" ||
+               symbol.kind == "getter" ||
+               symbol.kind == "setter" ||
+               symbol.kind == "instance_variable"
+              STDERR.puts "DEBUG: Found member in lib cache: #{symbol.name} (#{symbol.kind})"
+              results << symbol
+            end
+          end
+        end
+      end
+
+      STDERR.puts "DEBUG: Total members found: #{results.size}"
 
       results
     end
@@ -735,19 +839,26 @@ module Liger
 
       # Property declarations
       if match = line.match(/^\s*(?:property|getter|setter)\s+(\w+)\s*:\s*(\w+)/)
-        prop_name = "@#{match[1]}"
+        prop_name = match[1]
         prop_type = match[2]
+        prop_kind_match = line.match(/^\s*(property|getter|setter)/)
+        prop_kind = prop_kind_match ? prop_kind_match[1] : "property"
+        full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
         doc = extract_documentation(lines, line_num)
-        symbols << SymbolInfo.new(prop_name, prop_type, "property", file_path, line_num, line.strip, doc)
+        symbols << SymbolInfo.new("@#{prop_name}", prop_type, prop_kind, file_path, line_num, line.strip, doc)
+        symbols << SymbolInfo.new(full_prop_name, prop_type, prop_kind, file_path, line_num, line.strip, doc) if current_namespace.any?
       end
 
       # Instance variables
       if match = line.match(/^\s*@(\w+)\s*:\s*(\w+)/)
         var_name = "@#{match[1]}"
         var_type = match[2]
+        full_var_name = current_namespace.empty? ? var_name : "#{current_namespace.join("::")}::#{var_name}"
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new(
           var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc)
+        symbols << SymbolInfo.new(
+          full_var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc) if current_namespace.any?
       end
 
       # Constants
@@ -887,23 +998,26 @@ module Liger
 
         # Property declarations (property, getter, setter)
         if match = line.match(/^\s*property\s+(\w+)\s*:\s*(\w+)/)
-          prop_name = "@#{match[1]}"
+          prop_name = match[1]
           prop_type = match[2]
-          containing_type = current_namespace.join("::") || "Object"
+          full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(prop_name, prop_type, "property", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new("@#{prop_name}", prop_type, "property", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(full_prop_name, prop_type, "property", file_path, line_num, line.strip, doc) if current_namespace.any?
         elsif match = line.match(/^\s*getter\s+(\w+)\s*:\s*(\w+)/)
-          prop_name = "@#{match[1]}"
+          prop_name = match[1]
           prop_type = match[2]
-          containing_type = current_namespace.join("::") || "Object"
+          full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(prop_name, prop_type, "getter", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new("@#{prop_name}", prop_type, "getter", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(full_prop_name, prop_type, "getter", file_path, line_num, line.strip, doc) if current_namespace.any?
         elsif match = line.match(/^\s*setter\s+(\w+)\s*:\s*(\w+)/)
-          prop_name = "@#{match[1]}"
+          prop_name = match[1]
           prop_type = match[2]
-          containing_type = current_namespace.join("::") || "Object"
+          full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(prop_name, prop_type, "setter", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new("@#{prop_name}", prop_type, "setter", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(full_prop_name, prop_type, "setter", file_path, line_num, line.strip, doc) if current_namespace.any?
         end
 
         # Method definitions with return types
@@ -913,11 +1027,9 @@ module Liger
           containing_type = current_namespace.join("::") || "Object"
           full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
           doc = extract_documentation(lines, line_num)
-          # Store with full name if inside a namespace
           symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
         elsif match = line.match(/^\s*def\s+(?:self\.)?(\w+)(?:\([^)]*\))?/)
           method_name = match[1]
-          # Try to infer return type from method body
           return_type = infer_method_return_type(lines, line_num)
           containing_type = current_namespace.join("::") || "Object"
           full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
