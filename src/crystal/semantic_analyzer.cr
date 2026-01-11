@@ -610,7 +610,10 @@ module Liger
       line[start_pos...end_pos]
     end
 
-    private def add_type_aware_completions(items : Array(LSP::CompletionItem), context_output : String)
+    private def add_type_aware_completions(
+      items : Array(LSP::CompletionItem),
+      context_output : String,
+    )
       if match = context_output.match(/(\w+)#(\w+)/)
         type_name = match[1]
       end
