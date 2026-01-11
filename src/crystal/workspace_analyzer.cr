@@ -194,8 +194,20 @@ module Liger
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [class_name]).join("::")
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(class_name, parent_class, "class", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            class_name,
+            parent_class,
+            "class",
+            file_path,
+            line_num,
+            line.strip,
+            doc)
+          symbols << SymbolInfo.new(
+            full_name,
+            parent_class,
+            "class",
+            file_path,
+            line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(class_name)
         elsif match = line.match(/^\s*module\s+(\w+)/)
           module_name = match[1]
