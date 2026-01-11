@@ -100,6 +100,15 @@ module Liger
       return nil if position.line >= lines.size
 
       line_text = lines[position.line]
+
+      if location = handle_require_definition(line_text, position, uri)
+        return location
+      end
+
+      if location = handle_fun_definition(line_text, position, source, uri)
+        return location
+      end
+
       word = extract_word_at_position(line_text, position.character)
       File.write(
         "/tmp/liger_logs.log", "find_definition: extracted word '#{word}' from line '#{line_text}' at char #{position.character}\n", mode: "a"
@@ -232,6 +241,19 @@ module Liger
       source = @sources[uri]?
       return nil unless source
 
+      lines = source.split('\n')
+      return nil if position.line >= lines.size
+
+      line_text = lines[position.line]
+
+      if hover_info = handle_require_hover(line_text, position, uri)
+        return hover_info
+      end
+
+      if hover_info = handle_fun_hover(line_text, position, source)
+        return hover_info
+      end
+
       if hover_info = get_hover_from_workspace(uri, source, position)
         return hover_info
       end
@@ -271,10 +293,6 @@ module Liger
         STDERR.puts "Error getting hover info: #{ex.message}"
       end
 
-      lines = source.split('\n')
-      return nil if position.line >= lines.size
-
-      line_text = lines[position.line]
       word = extract_word_at_position(line_text, position.character)
 
       if word && !word.empty?
@@ -625,6 +643,204 @@ module Liger
 
       return nil if word.empty?
       word
+    end
+
+    # Handle goto definition for require statements
+    private def handle_require_definition(line : String, position : LSP::Position, uri : String) : LSP::Location?
+      return nil unless line.strip.starts_with?("require")
+
+      if match = line.match(/require\s+["']([^"']+)["']/)
+        require_path = match[1]
+
+        quote_start = match.begin(1)
+        quote_end = match.end(1)
+        return nil if position.character < quote_start || position.character > quote_end
+
+        STDERR.puts "Found require statement for: #{require_path}"
+
+        if location = resolve_require_path(require_path, uri)
+          return location
+        end
+      end
+
+      nil
+    end
+
+    # Resolve require path to actual file location
+    private def resolve_require_path(require_path : String, uri : String) : LSP::Location?
+      current_file = uri_to_filename(uri)
+      workspace_path = @workspace_root ? uri_to_filename(@workspace_root.not_nil!) : File.dirname(current_file)
+
+      if require_path.starts_with?("./") || require_path.starts_with?("../")
+        base_dir = File.dirname(current_file)
+        resolved_path = File.expand_path(require_path + ".cr", base_dir)
+
+        if File.exists?(resolved_path)
+          return create_location_for_file(resolved_path)
+        end
+      end
+
+      lib_path = File.join(workspace_path, "lib", require_path, "src", "#{require_path}.cr")
+      if File.exists?(lib_path)
+        STDERR.puts "Found shard file: #{lib_path}"
+        return create_location_for_file(lib_path)
+      end
+
+      lib_base = File.join(workspace_path, "lib", require_path)
+      if Dir.exists?(lib_base)
+        alt_path = File.join(lib_base, "src", "#{File.basename(require_path)}.cr")
+        if File.exists?(alt_path)
+          return create_location_for_file(alt_path)
+        end
+
+        alt_path = File.join(lib_base, "src", "lib.cr")
+        if File.exists?(alt_path)
+          return create_location_for_file(alt_path)
+        end
+
+        alt_path = File.join(lib_base, "#{File.basename(require_path)}.cr")
+        if File.exists?(alt_path)
+          return create_location_for_file(alt_path)
+        end
+      end
+
+      nil
+    end
+
+    # Create a location pointing to the start of a file
+    private def create_location_for_file(file_path : String) : LSP::Location
+      file_uri = filename_to_uri(file_path)
+      range = LSP::Range.new(
+        LSP::Position.new(0, 0),
+        LSP::Position.new(0, 0)
+      )
+      LSP::Location.new(file_uri, range)
+    end
+
+    # Handle goto definition for fun (extern function) statements
+    private def handle_fun_definition(
+      line : String,
+      position : LSP::Position,
+      source : String,
+      uri : String,
+    ) : LSP::Location?
+      return nil unless line.strip.starts_with?("fun") || line.includes?(" fun ")
+
+      if match = line.match(/fun\s+(\w+)/)
+        fun_name = match[1]
+        fun_start = match.begin(1)
+        fun_end = match.end(1)
+
+        return nil if position.character < fun_start || position.character > fun_end
+
+        range = LSP::Range.new(
+          LSP::Position.new(position.line, fun_start),
+          LSP::Position.new(position.line, fun_end)
+        )
+
+        return LSP::Location.new(uri, range)
+      end
+
+      nil
+    end
+
+    # Handle hover for require statements
+    private def handle_require_hover(
+      line : String,
+      position : LSP::Position,
+      uri : String,
+    ) : LSP::Hover?
+      return nil unless line.strip.starts_with?("require")
+
+      if match = line.match(/require\s+["']([^"']+)["']/)
+        require_path = match[1]
+        quote_start = match.begin(1)
+        quote_end = match.end(1)
+
+        return nil if position.character < quote_start || position.character > quote_end
+
+        if location = resolve_require_path(require_path, uri)
+          resolved_file = uri_to_filename(location.uri)
+          content = "**Require Statement**\n\n"
+          content += "Resolves to: `#{resolved_file}`\n\n"
+          content += "```crystal\nrequire \"#{require_path}\"\n```"
+
+          return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+        else
+          content = "**Require Statement**\n\n"
+          content += "Path: `#{require_path}`\n\n"
+
+          workspace_path = @workspace_root ? uri_to_filename(
+            @workspace_root.not_nil!
+          ) : File.dirname(uri_to_filename(uri))
+
+          if require_path.starts_with?("./") || require_path.starts_with?("../")
+            content += "Type: Relative require\n\n"
+          else
+            lib_path = File.join(workspace_path, "lib", require_path)
+            if Dir.exists?(lib_path)
+              content += "Type: Shard dependency\n\n"
+              content += "Location: `#{lib_path}`\n\n"
+            else
+              content += "Type: Standard library or unresolved dependency\n\n"
+            end
+          end
+
+          content += "```crystal\nrequire \"#{require_path}\"\n```"
+          return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+        end
+      end
+
+      nil
+    end
+
+    # Handle hover for fun (extern) statements
+    private def handle_fun_hover(
+      line : String,
+      position : LSP::Position,
+      source : String,
+    ) : LSP::Hover?
+      return nil unless line.strip.starts_with?("fun") || line.includes?(" fun ")
+
+      if match = line.match(/fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
+        fun_name = match[1]
+        fun_start = match.begin(1)
+        fun_end = match.end(1)
+
+        return nil if position.character < fun_start || position.character > fun_end + 10
+
+        actual_name = match[2]?
+        args = match[3]? || "()"
+        return_type = match[4]? || "Void"
+
+        content = "**Extern Function Declaration**\n\n"
+        content += "```crystal\n"
+
+        if actual_name
+          content += "fun #{fun_name} = #{actual_name}#{args}"
+        else
+          content += "fun #{fun_name}#{args}"
+        end
+
+        unless return_type.strip.empty?
+          content += " : #{return_type.strip}"
+        end
+
+        content += "\n```\n\n"
+
+        if actual_name
+          content += "Crystal name: `#{fun_name}`\n\n"
+          content += "C name: `#{actual_name}`\n\n"
+        else
+          content += "C name: `#{fun_name}`\n\n"
+        end
+
+        content += "*External function binding for C library*"
+
+        return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+      end
+
+      nil
     end
 
     private def add_type_aware_completions(
