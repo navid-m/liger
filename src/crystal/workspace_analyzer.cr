@@ -50,6 +50,120 @@ module Liger
       scan_workspace_if_needed
     end
 
+    def get_class_members(class_name : String) : String?
+      scan_workspace_if_needed
+      members = [] of String
+
+      class_symbol = nil
+      @symbol_cache.each_value do |symbols|
+        class_symbol = symbols.find { |s| s.kind == "class" && s.name == class_name }
+        break if class_symbol
+      end
+
+      return nil unless class_symbol
+
+      if content = @file_cache[class_symbol.file]?
+        members = extract_type_members(content, class_name, "class")
+      end
+
+      members.empty? ? nil : members.join("\n")
+    end
+
+    def get_struct_members(struct_name : String) : String?
+      scan_workspace_if_needed
+      members = [] of String
+
+      struct_symbol = nil
+      @symbol_cache.each_value do |symbols|
+        struct_symbol = symbols.find { |s| s.kind == "struct" && s.name == struct_name }
+        break if struct_symbol
+      end
+
+      return nil unless struct_symbol
+
+      if content = @file_cache[struct_symbol.file]?
+        members = extract_type_members(content, struct_name, "struct")
+      end
+
+      members.empty? ? nil : members.join("\n")
+    end
+
+    private def extract_type_members(content : String, type_name : String, type_kind : String) : Array(String)
+      lines = content.split('\n')
+      members = [] of String
+      in_type = false
+      indent_level = 0
+
+      lines.each do |line|
+        if line.match(/^\s*#{type_kind}\s+#{Regex.escape(type_name)}\b/)
+          in_type = true
+          indent_level = line.size - line.lstrip.size
+          next
+        end
+
+        if in_type
+          current_indent = line.size - line.lstrip.size
+
+          if line.match(/^\s*end\s*$/) && current_indent <= indent_level
+            break
+          end
+
+          if line.match(/^\s*(?:class|struct|module|enum)\s+/) && current_indent > indent_level
+            next
+          end
+
+          if match = line.match(/^\s*(?:private\s+)?def\s+(\w+)(?:\([^)]*\))?\s*(?::\s*(\w+))?/)
+            method_name = match[1]
+            return_type = match[2]? || "Object"
+            members << "- `def #{method_name} : #{return_type}` (method)"
+          elsif match = line.match(/^\s*(property|getter|setter)\s+(\w+)\s*:\s*(\w+)/)
+            prop_kind = match[1]
+            prop_name = match[2]
+            prop_type = match[3]
+            members << "- `#{prop_name} : #{prop_type}` (#{prop_kind})"
+          elsif match = line.match(/^\s*@(\w+)\s*:\s*(\w+)/)
+            var_name = match[1]
+            var_type = match[2]
+            members << "- `@#{var_name} : #{var_type}` (instance variable)"
+          end
+        end
+      end
+
+      members
+    end
+
+    def get_enum_values(enum_name : String, enum_file : String) : String?
+      return nil unless File.exists?(enum_file)
+
+      content = @file_cache[enum_file]? || File.read(enum_file)
+      lines = content.split('\n')
+      values = [] of String
+      in_enum = false
+
+      lines.each do |line|
+        if line.match(/^\s*enum\s+#{Regex.escape(enum_name)}\b/)
+          in_enum = true
+          next
+        end
+
+        if in_enum
+          if line.match(/^\s*end\s*$/)
+            break
+          elsif match = line.match(/^\s*(\w+)(?:\s*=\s*(.+))?/)
+            value_name = match[1]
+            value_expr = match[2]?
+            if value_expr
+              values << "- `#{value_name} = #{value_expr.strip}`"
+            else
+              values << "- `#{value_name}`"
+            end
+          end
+        end
+      end
+
+      values.empty? ? nil : values.join("\n")
+    end
+
     def find_symbol_info(symbol_name : String) : SymbolInfo?
       scan_workspace_if_needed
 

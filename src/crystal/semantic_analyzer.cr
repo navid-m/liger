@@ -754,13 +754,25 @@ module Liger
                       "```crystal\ndef #{symbol.name} : #{symbol.type}\n```"
                     end
                   when "class"
-                    "```crystal\nclass #{symbol.name} < #{symbol.type}\n```"
+                    class_content = "```crystal\nclass #{symbol.name} < #{symbol.type}\n```"
+                    if members = @workspace_analyzer.get_class_members(symbol.name)
+                      class_content += "\n\n**Members:**\n" + members
+                    end
+                    class_content
                   when "module"
                     "```crystal\nmodule #{symbol.name}\n```"
                   when "enum"
-                    "```crystal\nenum #{symbol.name}\n```"
+                    enum_content = "```crystal\nenum #{symbol.name}\n```"
+                    if values = @workspace_analyzer.get_enum_values(symbol.name, symbol.file)
+                      enum_content += "\n\n**Values:**\n" + values
+                    end
+                    enum_content
                   when "struct"
-                    "```crystal\nstruct #{symbol.name}\n```"
+                    struct_content = "```crystal\nstruct #{symbol.name}\n```"
+                    if members = @workspace_analyzer.get_struct_members(symbol.name)
+                      struct_content += "\n\n**Members:**\n" + members
+                    end
+                    struct_content
                   when "property", "getter", "setter"
                     "```crystal\n#{symbol.kind} #{symbol.name.sub("@", "")} : #{symbol.type}\n```"
                   when "instance_variable"
@@ -832,19 +844,107 @@ module Liger
         end
 
         if match = line.match(/^\s*(class\s+#{Regex.escape(method_name)}(?:\s*<\s*\w+)?)/)
-          return match[1].strip
+          class_signature = match[1].strip
+
+          docs = [] of String
+          current_line = line_num - 1
+
+          while current_line >= 0
+            doc_line = lines[current_line].strip
+            if doc_line.starts_with?("#")
+              docs.unshift(doc_line.sub(/^#\s?/, ""))
+              current_line -= 1
+            elsif doc_line.empty?
+              current_line -= 1
+            else
+              break
+            end
+          end
+
+          result = class_signature
+          if !docs.empty?
+            result += "\n\n" + docs.join("\n")
+          end
+
+          return result
         end
 
         if match = line.match(/^\s*(module\s+#{Regex.escape(method_name)})/)
-          return match[1].strip
+          module_signature = match[1].strip
+
+          docs = [] of String
+          current_line = line_num - 1
+
+          while current_line >= 0
+            doc_line = lines[current_line].strip
+            if doc_line.starts_with?("#")
+              docs.unshift(doc_line.sub(/^#\s?/, ""))
+              current_line -= 1
+            elsif doc_line.empty?
+              current_line -= 1
+            else
+              break
+            end
+          end
+
+          result = module_signature
+          if !docs.empty?
+            result += "\n\n" + docs.join("\n")
+          end
+
+          return result
         end
 
         if match = line.match(/^\s*(enum\s+#{Regex.escape(method_name)})/)
-          return match[1].strip
+          enum_signature = match[1].strip
+
+          docs = [] of String
+          current_line = line_num - 1
+
+          while current_line >= 0
+            doc_line = lines[current_line].strip
+            if doc_line.starts_with?("#")
+              docs.unshift(doc_line.sub(/^#\s?/, ""))
+              current_line -= 1
+            elsif doc_line.empty?
+              current_line -= 1
+            else
+              break
+            end
+          end
+
+          result = enum_signature
+          if !docs.empty?
+            result += "\n\n" + docs.join("\n")
+          end
+
+          return result
         end
 
         if match = line.match(/^\s*(struct\s+#{Regex.escape(method_name)})/)
-          return match[1].strip
+          struct_signature = match[1].strip
+
+          docs = [] of String
+          current_line = line_num - 1
+
+          while current_line >= 0
+            doc_line = lines[current_line].strip
+            if doc_line.starts_with?("#")
+              docs.unshift(doc_line.sub(/^#\s?/, ""))
+              current_line -= 1
+            elsif doc_line.empty?
+              current_line -= 1
+            else
+              break
+            end
+          end
+
+          result = struct_signature
+          if !docs.empty?
+            result += "\n\n" + docs.join("\n")
+          end
+
+          return result
         end
 
         if match = line.match(
