@@ -137,24 +137,9 @@ module Liger
         def_uri = filename_to_uri(symbol.file)
         range = LSP::Range.new(
           LSP::Position.new(symbol.line, 0),
-          LSP::Position.new(symbol.line, word.size)
+          LSP::Position.new(symbol.line, word.split("::").last.size)
         )
         return LSP::Location.new(def_uri, range)
-      end
-
-      base_name = word.split("::").last
-      if base_name != word
-        if symbol = @workspace_analyzer.find_symbol_info(base_name)
-          {% if flag?(:debug) %}
-            STDERR.puts "Found symbol by base name: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
-          {% end %}
-          def_uri = filename_to_uri(symbol.file)
-          range = LSP::Range.new(
-            LSP::Position.new(symbol.line, 0),
-            LSP::Position.new(symbol.line, base_name.size)
-          )
-          return LSP::Location.new(def_uri, range)
-        end
       end
 
       if dot_pos = find_dot_in_line(line_text, position.character)
@@ -1287,7 +1272,7 @@ module Liger
       return nil if position.line >= lines.size
 
       line_text = lines[position.line]
-      word = extract_word_at_position(line_text, position.character)
+      word = extract_qualified_name_at_position(line_text, position.character)
       return nil unless word
 
       if dot_pos = find_dot_in_line(line_text, position.character)

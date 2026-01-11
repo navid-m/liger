@@ -173,6 +173,8 @@ module Liger
         sample = @symbol_cache.values.first.first(10).map(&.name).join(", ")
       end
 
+      is_qualified = symbol_name.includes?("::")
+
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name == symbol_name
@@ -181,10 +183,12 @@ module Liger
         end
       end
 
-      @symbol_cache.each_value do |symbols|
-        symbols.each do |symbol|
-          if symbol.name.ends_with?("::#{symbol_name}")
-            return symbol
+      if is_qualified
+        @symbol_cache.each_value do |symbols|
+          symbols.each do |symbol|
+            if symbol.name == symbol_name || symbol.name.ends_with?("::#{symbol_name}")
+              return symbol
+            end
           end
         end
       end
@@ -203,10 +207,32 @@ module Liger
         end
       end
 
-      @stdlib_cache.each_value do |symbols|
-        symbols.each do |symbol|
-          if symbol.name.ends_with?("::#{symbol_name}")
-            return symbol
+      if is_qualified
+        @stdlib_cache.each_value do |symbols|
+          symbols.each do |symbol|
+            if symbol.name == symbol_name || symbol.name.ends_with?("::#{symbol_name}")
+              return symbol
+            end
+          end
+        end
+      end
+
+      unless is_qualified
+        base_name = symbol_name.split("::").last
+
+        @symbol_cache.each_value do |symbols|
+          symbols.each do |symbol|
+            if symbol.name.ends_with?("::#{base_name}")
+              return symbol
+            end
+          end
+        end
+
+        @stdlib_cache.each_value do |symbols|
+          symbols.each do |symbol|
+            if symbol.name.ends_with?("::#{base_name}")
+              return symbol
+            end
           end
         end
       end
@@ -461,6 +487,8 @@ module Liger
           symbols << SymbolInfo.new(full_name, "Enum", "enum", file_path, line_num, line.strip, doc)
 
           current_namespace.push(enum_name)
+        elsif match = line.match(/^\s*annotation\s+(\w+)/)
+          current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.any?
         elsif match = line.match(/^\s*def\s+(?:self\.)?(\w+)(?:\([^)]*\))?\s*(?::\s*(\w+))?/)
@@ -571,6 +599,8 @@ module Liger
             full_name, "Module", "module", file_path, line_num, line.strip, doc
           ) if current_namespace.any?
           current_namespace.push(module_name)
+        elsif match = line.match(/^\s*annotation\s+(\w+)/)
+          current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.any?
         end
@@ -687,6 +717,9 @@ module Liger
           symbols << SymbolInfo.new(
             full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(current_module)
+          namespace_indent_levels.push(line_indent)
+        elsif match = line.match(/^\s*annotation\s+(\w+)/)
+          current_namespace.push("__annotation__")
           namespace_indent_levels.push(line_indent)
         elsif line.match(/^\s*end\s*$/)
           if current_namespace.any? && namespace_indent_levels.any?
