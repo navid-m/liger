@@ -38,4 +38,6 @@ if PROGRAM_NAME.includes?("liger")
     STDERR.puts "Server crashed: #{exception.message}"
     STDERR.flush
   end
+else
+  STDERR.puts "Rename the executable to 'liger'."
 end
