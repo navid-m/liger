@@ -22,7 +22,11 @@ module LSP
     property result : JSON::Any?
     property error : ResponseError?
 
-    def initialize(@id : String | Int32 | Nil, @result : JSON::Any? = nil, @error : ResponseError? = nil)
+    def initialize(
+      @id : String | Int32 | Nil,
+      @result : JSON::Any? = nil,
+      @error : ResponseError? = nil,
+    )
       @jsonrpc = "2.0"
     end
   end
@@ -76,7 +80,11 @@ module LSP
       @notifications[method] = block
     end
 
-    def send_response(id : String | Int32 | Nil, result : JSON::Any? = nil, error : ResponseError? = nil)
+    def send_response(
+      id : String | Int32 | Nil,
+      result : JSON::Any? = nil,
+      error : ResponseError? = nil,
+    )
       response = ResponseMessage.new(id, result, error)
       send_message(response)
     end
