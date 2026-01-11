@@ -929,9 +929,9 @@ module Liger
 
         if actual_name
           content += "Crystal name: `#{fun_name}`\n\n"
-          content += "C name: `#{actual_name}`\n\n"
+          content += "C name:       `#{actual_name}`\n\n"
         else
-          content += "C name: `#{fun_name}`\n\n"
+          content += "C name:       `#{fun_name}`\n\n"
         end
 
         content += "*External function binding for C library*"
