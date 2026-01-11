@@ -380,7 +380,10 @@ module LSP
     property? resolve_provider : Bool?
     property? trigger_characters : Array(String)?
 
-    def initialize(@trigger_characters : Array(String)? = nil, @resolve_provider : Bool? = nil)
+    def initialize(
+      @trigger_characters : Array(String)? = nil,
+      @resolve_provider : Bool? = nil,
+    )
     end
   end
 
