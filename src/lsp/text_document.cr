@@ -16,7 +16,11 @@ module LSP
     end
 
     # Change a text document
-    def change(uri : DocumentUri, version : Int32, changes : Array(TextDocumentContentChangeEvent))
+    def change(
+      uri : DocumentUri,
+      version : Int32,
+      changes : Array(TextDocumentContentChangeEvent),
+    )
       doc = @documents[uri]?
       return unless doc
 
