@@ -614,7 +614,14 @@ module Liger
       end
 
       return nil if start_pos == end_pos
-      line[start_pos...end_pos]
+      word = line[start_pos...end_pos]
+
+      if word.ends_with?('?') || word.ends_with?('!')
+        word = word[0...-1]
+      end
+
+      return nil if word.empty?
+      word
     end
 
     private def add_type_aware_completions(
@@ -1024,8 +1031,19 @@ module Liger
           return LSP::Location.new(uri, range)
         end
 
+        # Struct definitions
+        if match = line.match(/^\s*struct\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
+          File.write("/tmp/liger_logs.log", "find_definition_in_current_file: found struct '#{symbol_name}' on line #{line_num}: #{line}\n", mode: "a")
+          range = LSP::Range.new(
+            LSP::Position.new(line_num, match.begin(1).not_nil!),
+            LSP::Position.new(line_num, match.end(1).not_nil!)
+          )
+          return LSP::Location.new(uri, range)
+        end
+
         # Class definitions
         if match = line.match(/^\s*class\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
+          File.write("/tmp/liger_logs.log", "find_definition_in_current_file: found class '#{symbol_name}' on line #{line_num}: #{line}\n", mode: "a")
           range = LSP::Range.new(
             LSP::Position.new(line_num, match.begin(1).not_nil!),
             LSP::Position.new(line_num, match.end(1).not_nil!)
