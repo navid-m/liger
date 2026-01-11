@@ -17,7 +17,15 @@ module Liger
       property signature : String?
       property documentation : String?
 
-      def initialize(@name : String, @type : String, @kind : String, @file : String, @line : Int32, @signature : String? = nil, @documentation : String? = nil)
+      def initialize(
+        @name : String,
+        @type : String,
+        @kind : String,
+        @file : String,
+        @line : Int32,
+        @signature : String? = nil,
+        @documentation : String? = nil,
+      )
       end
     end
 
