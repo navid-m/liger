@@ -198,7 +198,6 @@ module Liger
       @stdlib_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name == symbol_name
-            File.write("/tmp/liger_logs.log", "Found exact match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}\n", mode: "a")
             return symbol
           end
         end
@@ -207,13 +206,11 @@ module Liger
       @stdlib_cache.each_value do |symbols|
         symbols.each do |symbol|
           if symbol.name.ends_with?("::#{symbol_name}")
-            File.write("/tmp/liger_logs.log", "Found partial match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}\n", mode: "a")
             return symbol
           end
         end
       end
 
-      File.write("/tmp/liger_logs.log", "No symbol found for: '#{symbol_name}'\n", mode: "a")
       nil
     end
 
@@ -329,14 +326,6 @@ module Liger
           STDERR.puts "Scanning lib directory (one-time): #{lib_path}"
           scan_lib_directory(lib_path)
           @lib_scanned = true
-          File.write("/tmp/liger_logs.log", "=== Lib symbols cached ===\n", mode: "a")
-          @lib_cache.each do |file, symbols|
-            symbols.each do |symbol|
-              if symbol.kind == "method"
-                File.write("/tmp/liger_logs.log", "  Method: #{symbol.name} in #{file}:#{symbol.line}\n", mode: "a")
-              end
-            end
-          end
         end
       end
 
@@ -684,7 +673,6 @@ module Liger
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [current_class]).join("::")
           doc = extract_documentation(lines, line_num)
-          File.write("/tmp/liger_logs.log", "Found class #{current_class} at #{file_path}:#{line_num}, namespace: #{current_namespace.inspect}\n", mode: "a") if file_path.includes?("crystglfw")
           symbols << SymbolInfo.new(
             current_class, parent_class, "class", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
@@ -695,7 +683,6 @@ module Liger
           current_module = match[1]
           full_name = (current_namespace + [current_module]).join("::")
           doc = extract_documentation(lines, line_num)
-          File.write("/tmp/liger_logs.log", "Found module #{current_module} at #{file_path}:#{line_num}, indent: #{line_indent}, namespace: #{current_namespace.inspect}\n", mode: "a") if file_path.includes?("crystglfw")
           symbols << SymbolInfo.new(current_module, "Module", "module", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
             full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
@@ -707,14 +694,11 @@ module Liger
             if line_indent <= last_indent
               popped = current_namespace.pop
               namespace_indent_levels.pop
-              File.write("/tmp/liger_logs.log", "Popped #{popped} from namespace at #{file_path}:#{line_num}, indent: #{line_indent} <= #{last_indent}, remaining: #{current_namespace.inspect}\n", mode: "a") if file_path.includes?("crystglfw")
               if popped == current_class
                 current_class = nil
               elsif popped == current_module
                 current_module = nil
               end
-            else
-              File.write("/tmp/liger_logs.log", "Skipping end at #{file_path}:#{line_num}, indent: #{line_indent} > #{last_indent} (block end, not module/class end)\n", mode: "a") if file_path.includes?("crystglfw")
             end
           end
         end
@@ -791,7 +775,6 @@ module Liger
           full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
           doc = extract_documentation(lines, line_num)
           # Store with full name if inside a namespace
-          File.write("/tmp/liger_logs.log", "Method '#{method_name}' at #{file_path}:#{line_num}, namespace: #{current_namespace.inspect}, storing as: #{full_method_name}\n", mode: "a") if file_path.includes?("crystglfw") && method_name == "poll_events"
           symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
         elsif match = line.match(/^\s*def\s+(?:self\.)?(\w+)(?:\([^)]*\))?/)
           method_name = match[1]
@@ -800,7 +783,6 @@ module Liger
           containing_type = current_namespace.join("::") || "Object"
           full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
           doc = extract_documentation(lines, line_num)
-          File.write("/tmp/liger_logs.log", "Method '#{method_name}' at #{file_path}:#{line_num}, namespace: #{current_namespace.inspect}, storing as: #{full_method_name}\n", mode: "a") if file_path.includes?("crystglfw") && method_name == "poll_events"
           symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
         end
 
@@ -1087,11 +1069,6 @@ module Liger
     def find_method_definition(receiver_type : String, method_name : String) : SymbolInfo?
       scan_workspace_if_needed
 
-      File.write("/tmp/liger_logs.log", "=== find_method_definition ===\n", mode: "a")
-      File.write("/tmp/liger_logs.log", "Looking for method '#{method_name}' on receiver '#{receiver_type}'\n", mode: "a")
-      File.write("/tmp/liger_logs.log", "Total workspace symbols: #{@symbol_cache.values.sum(&.size)}\n", mode: "a")
-      File.write("/tmp/liger_logs.log", "Total lib symbols: #{@lib_cache.values.sum(&.size)}\n", mode: "a")
-
       full_method_name = "#{receiver_type}::#{method_name}"
 
       @symbol_cache.each_value do |symbols|
@@ -1099,7 +1076,6 @@ module Liger
           if symbol.kind == "method"
             if symbol.name == full_method_name || symbol.name.ends_with?("::#{method_name}")
               if symbol.name.includes?(receiver_type)
-                File.write("/tmp/liger_logs.log", "Found method in workspace: #{symbol.name} in #{symbol.file}:#{symbol.line}\n", mode: "a")
                 return symbol
               end
             end
@@ -1112,7 +1088,6 @@ module Liger
           if symbol.kind == "method"
             if symbol.name == full_method_name || symbol.name.ends_with?("::#{method_name}")
               if symbol.name.includes?(receiver_type)
-                File.write("/tmp/liger_logs.log", "Found method in lib: #{symbol.name} in #{symbol.file}:#{symbol.line}\n", mode: "a")
                 return symbol
               end
             end
@@ -1120,7 +1095,6 @@ module Liger
         end
       end
 
-      File.write("/tmp/liger_logs.log", "Method not found\n", mode: "a")
       nil
     end
 

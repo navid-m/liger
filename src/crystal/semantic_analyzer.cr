@@ -124,11 +124,6 @@ module Liger
 
       word = extract_qualified_name_at_position(line_text, position.character)
 
-      File.write("/tmp/liger_logs.log", "=== find_definition ===\n", mode: "a")
-      File.write("/tmp/liger_logs.log", "Line: #{line_text}\n", mode: "a")
-      File.write("/tmp/liger_logs.log", "Position: #{position.character}\n", mode: "a")
-      File.write("/tmp/liger_logs.log", "Word: #{word.inspect}\n", mode: "a")
-
       return nil unless word
 
       {% if flag?(:debug) %}
@@ -162,35 +157,26 @@ module Liger
         end
       end
 
-      File.write("/tmp/liger_logs.log", "Checking for dot in line before position #{position.character}\n", mode: "a")
       if dot_pos = find_dot_in_line(line_text, position.character)
-        File.write("/tmp/liger_logs.log", "Found dot before cursor at position #{dot_pos}\n", mode: "a")
         receiver_word = extract_word_before_dot(line_text, dot_pos)
         if receiver_word
-          File.write("/tmp/liger_logs.log", "Receiver: #{receiver_word}, Method: #{word}\n", mode: "a")
           receiver_type = @workspace_analyzer.get_type_at_position(
             uri,
             source,
             LSP::Position.new(position.line, dot_pos - 1)
           )
-          File.write("/tmp/liger_logs.log", "Receiver type: #{receiver_type.inspect}\n", mode: "a")
           if receiver_type
             symbol = @workspace_analyzer.find_method_definition(receiver_type, word)
             if symbol
-              File.write("/tmp/liger_logs.log", "Found method via receiver: #{symbol.name}\n", mode: "a")
               def_uri = filename_to_uri(symbol.file)
               range = LSP::Range.new(
                 LSP::Position.new(symbol.line, 0),
                 LSP::Position.new(symbol.line, symbol.name.size)
               )
               return LSP::Location.new(def_uri, range)
-            else
-              File.write("/tmp/liger_logs.log", "Method not found for receiver\n", mode: "a")
             end
           end
         end
-      else
-        File.write("/tmp/liger_logs.log", "No dot found before position #{position.character}\n", mode: "a")
       end
 
       if location = find_definition_in_current_file(source, word, uri)
@@ -223,9 +209,6 @@ module Liger
         main_file = find_main_file(filename)
         args = ["tool", "implementations", "-c", cursor_loc]
         args << main_file if main_file
-
-        STDERR.puts "find_definition: cursor=#{cursor_loc}, main=#{main_file || "none"}"
-        STDERR.puts "find_definition command: crystal #{args.join(" ")}"
 
         if source = @sources[uri]
           source_hash = source.hash
