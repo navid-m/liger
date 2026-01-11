@@ -235,14 +235,24 @@ module Liger
           full_name = (current_namespace + [class_name]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(class_name, parent_class, "class", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name,
+            parent_class,
+            "class",
+            file_path,
+            line_num,
+            line.strip,
+            doc
+          ) if current_namespace.any?
           current_namespace.push(class_name)
         elsif match = line.match(/^\s*module\s+(\w+)/)
           module_name = match[1]
           full_name = (current_namespace + [module_name]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(module_name, "Module", "module", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name,
+            "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(module_name)
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.any?
@@ -358,7 +368,14 @@ module Liger
       @symbol_cache[file_path] = symbols
     end
 
-    private def scan_line_for_symbols(line : String, line_num : Int32, file_path : String, current_namespace : Array(String), symbols : Array(SymbolInfo), lines : Array(String))
+    private def scan_line_for_symbols(
+      line : String,
+      line_num : Int32,
+      file_path : String,
+      current_namespace : Array(String),
+      symbols : Array(SymbolInfo),
+      lines : Array(String),
+    )
       # Enum definitions
       if match = line.match(/^\s*enum\s+(\w+)/)
         enum_name = match[1]
