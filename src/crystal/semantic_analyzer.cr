@@ -13,6 +13,7 @@ module Liger
     @sources = Hash(String, String).new
     @source_lines_cache = Hash(String, Array(String)).new
     @last_saved_hashes = Hash(String, UInt64).new
+    @temp_files = Hash(String, String).new
     @cache_dir : String?
     @main_file_cache : String?
     @main_file_cache_time : Time?
@@ -47,6 +48,7 @@ module Liger
     def remove_source(uri : String)
       @sources.delete(uri)
       @source_lines_cache.delete(uri)
+      cleanup_temp_file(uri)
     end
 
     private def get_lines(uri : String) : Array(String)?
@@ -205,24 +207,21 @@ module Liger
       column = position.character + 1
 
       begin
-        cursor_loc = "#{filename}:#{line}:#{column}"
-
         output_io = IO::Memory.new
         error_io = IO::Memory.new
         main_file = find_main_file(filename)
-        args = ["tool", "implementations", "-c", cursor_loc]
-        args << main_file if main_file
+        args = ["tool", "implementations", "-c"]
 
         if source = @sources[uri]
-          source_hash = source.hash
-          if @last_saved_hashes[uri]? != source_hash
-            File.write(filename, source)
-            @last_saved_hashes[uri] = source_hash
-            STDERR.puts "Saved current file: #{filename}"
-          else
-            STDERR.puts "File unchanged, skipping save: #{filename}"
-          end
+          temp_file = get_temp_file_for_uri(uri, source)
+          cursor_loc = "#{temp_file}:#{line}:#{column}"
+          args << cursor_loc
+        else
+          cursor_loc = "#{filename}:#{line}:#{column}"
+          args << cursor_loc
         end
+
+        args << main_file if main_file
 
         Process.run("crystal", args,
           output: output_io,
@@ -294,16 +293,14 @@ module Liger
       column = position.character + 1
 
       begin
-        cursor_loc = "#{filename}:#{line}:#{column}"
         output_io = IO::Memory.new
         error_io = IO::Memory.new
 
         if source = @sources[uri]
-          source_hash = source.hash
-          if @last_saved_hashes[uri]? != source_hash
-            File.write(filename, source)
-            @last_saved_hashes[uri] = source_hash
-          end
+          temp_file = get_temp_file_for_uri(uri, source)
+          cursor_loc = "#{temp_file}:#{line}:#{column}"
+        else
+          cursor_loc = "#{filename}:#{line}:#{column}"
         end
 
         main_file = find_main_file(filename)
@@ -686,6 +683,38 @@ module Liger
       end
 
       filename.gsub('/', File::SEPARATOR)
+    end
+
+    # Get or create a temp file for the given URI
+    private def get_temp_file_for_uri(uri : String, source : String) : String
+      filename = uri_to_filename(uri)
+      source_hash = source.hash
+
+      if temp_file = @temp_files[uri]?
+        if @last_saved_hashes[uri]? == source_hash && File.exists?(temp_file)
+          return temp_file
+        else
+          File.delete(temp_file) if File.exists?(temp_file)
+        end
+      end
+
+      ext = File.extname(filename)
+      basename = File.basename(filename, ext)
+      temp_file = File.tempname("liger-#{basename}-", ext)
+
+      File.write(temp_file, source)
+      @temp_files[uri] = temp_file
+      @last_saved_hashes[uri] = source_hash
+
+      temp_file
+    end
+
+    # Clean up temp file for a URI
+    private def cleanup_temp_file(uri : String)
+      if temp_file = @temp_files.delete(uri)
+        File.delete(temp_file) if File.exists?(temp_file)
+      end
+      @last_saved_hashes.delete(uri)
     end
 
     private def filename_to_uri(filename : String) : String
@@ -1307,24 +1336,23 @@ module Liger
       "Object"
     end
 
-    private def get_type_via_crystal_tool(uri : String, source : String, position : LSP::Position) : String?
+    private def get_type_via_crystal_tool(
+      uri : String,
+      source : String,
+      position : LSP::Position,
+    ) : String?
       filename = uri_to_filename(uri)
       line = position.line + 1
       column = position.character + 1
 
       begin
-        cursor_loc = "#{filename}:#{line}:#{column}"
         output_io = IO::Memory.new
         error_io = IO::Memory.new
 
-        if source_hash = source.hash
-          if @last_saved_hashes[uri]? != source_hash
-            File.write(filename, source)
-            @last_saved_hashes[uri] = source_hash
-          end
-        end
+        temp_file = get_temp_file_for_uri(uri, source)
+        cursor_loc = "#{temp_file}:#{line}:#{column}"
 
-        Process.run("crystal", ["tool", "context", "-c", cursor_loc, filename],
+        Process.run("crystal", ["tool", "context", "-c", cursor_loc, temp_file],
           output: output_io,
           error: error_io)
 
@@ -1383,10 +1411,8 @@ module Liger
       if dot_pos = find_dot_in_line(line_text, position.character)
         receiver_word = extract_word_before_dot(line_text, dot_pos)
         if receiver_word
-          # Check if this is a lib function call (e.g., GL.clear)
           if lib_symbol = @workspace_analyzer.find_symbol_info(receiver_word)
             if lib_symbol.kind == "lib"
-              # Look for the function within this lib
               fun_qualified_name = "#{receiver_word}::#{word}"
               if fun_symbol = @workspace_analyzer.find_symbol_info(fun_qualified_name)
                 if fun_symbol.kind == "fun" && fun_symbol.signature
@@ -1897,7 +1923,10 @@ module Liger
       end
     end
 
-    private def extract_symbols_for_completion(node : Crystal::ASTNode, items : Array(LSP::CompletionItem))
+    private def extract_symbols_for_completion(
+      node : Crystal::ASTNode,
+      items : Array(LSP::CompletionItem),
+    )
       case node
       when Crystal::ClassDef
         items << LSP::CompletionItem.new(
