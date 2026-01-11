@@ -510,7 +510,8 @@ module Liger
         offset = 0
         while (index = line.index(old_name, offset))
           before_ok = index == 0 || !word_char?(line[index - 1])
-          after_ok = index + old_name.size >= line.size || !word_char?(line[index + old_name.size])
+          after_ok = index + old_name.size >= line.size ||
+                     !word_char?(line[index + old_name.size])
 
           if before_ok && after_ok
             range = LSP::Range.new(
