@@ -94,12 +94,16 @@ module Liger
       return nil unless source
 
       lines = source.split('\n')
-      File.write("/tmp/liger_logs.log", "find_definition: position.line #{position.line} >= lines.size #{lines.size}\n", mode: "a") if position.line >= lines.size
+      File.write(
+        "/tmp/liger_logs.log", "find_definition: position.line #{position.line} >= lines.size #{lines.size}\n", mode: "a"
+      ) if position.line >= lines.size
       return nil if position.line >= lines.size
 
       line_text = lines[position.line]
       word = extract_word_at_position(line_text, position.character)
-      File.write("/tmp/liger_logs.log", "find_definition: extracted word '#{word}' from line '#{line_text}' at char #{position.character}\n", mode: "a")
+      File.write(
+        "/tmp/liger_logs.log", "find_definition: extracted word '#{word}' from line '#{line_text}' at char #{position.character}\n", mode: "a"
+      )
       return nil unless word
 
       STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}"
