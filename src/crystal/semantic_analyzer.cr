@@ -971,7 +971,8 @@ module Liger
       symbols = @workspace_analyzer.find_symbols_in_namespace(namespace)
 
       symbols.each do |symbol|
-        if symbol.name.starts_with?(partial)
+        symbol_short_name = symbol.name.sub(/^.*::/, "")
+        if symbol_short_name.starts_with?(partial)
           kind = case symbol.kind
                  when "class"
                    LSP::CompletionItemKind::Class
@@ -981,14 +982,18 @@ module Liger
                    LSP::CompletionItemKind::Method
                  when "constant"
                    LSP::CompletionItemKind::Constant
+                 when "struct"
+                   LSP::CompletionItemKind::Struct
+                 when "enum"
+                   LSP::CompletionItemKind::Enum
                  else
                    LSP::CompletionItemKind::Variable
                  end
 
           items << LSP::CompletionItem.new(
-            symbol.name,
+            symbol_short_name,
             kind,
-            "#{namespace}::#{symbol.name}"
+            "#{namespace}::#{symbol_short_name}"
           )
         end
       end

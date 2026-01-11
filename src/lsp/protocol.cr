@@ -347,7 +347,7 @@ module LSP
     def initialize(
       @signatures : Array(SignatureInformation),
       @active_signature : Int32? = nil,
-      @active_parameter : Int32? = nil
+      @active_parameter : Int32? = nil,
     )
     end
   end

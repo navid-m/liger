@@ -211,13 +211,13 @@ module Liger
       STDERR.puts "No symbol found for: '#{symbol_name}'"
       nil
     end
-    
+
     def find_symbols_in_namespace(namespace : String) : Array(SymbolInfo)
       scan_workspace_if_needed
-      
+
       results = [] of SymbolInfo
       search_pattern = "#{namespace}::"
-      
+
       # Search workspace symbols
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
@@ -231,7 +231,7 @@ module Liger
           end
         end
       end
-      
+
       # Also search stdlib
       scan_stdlib_if_needed
       @stdlib_cache.each_value do |symbols|
@@ -244,7 +244,7 @@ module Liger
           end
         end
       end
-      
+
       results.uniq { |s| s.name }
     end
 
@@ -388,33 +388,42 @@ module Liger
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [class_name]).join("::")
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(class_name, parent_class, "class", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(
-            full_name,
-            parent_class,
-            "class",
-            file_path,
-            line_num,
-            line.strip,
-            doc
-          ) if current_namespace.any?
+
+          symbols << SymbolInfo.new(full_name, parent_class, "class", file_path, line_num, line.strip, doc)
+
           current_namespace.push(class_name)
         elsif match = line.match(/^\s*module\s+(\w+)/)
           module_name = match[1]
           full_name = (current_namespace + [module_name]).join("::")
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(module_name, "Module", "module", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(
-            full_name,
-            "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
+
+          symbols << SymbolInfo.new(full_name, "Module", "module", file_path, line_num, line.strip, doc)
+
           current_namespace.push(module_name)
+        elsif match = line.match(/^\s*struct\s+(\w+)/)
+          struct_name = match[1]
+          full_name = (current_namespace + [struct_name]).join("::")
+          doc = extract_documentation(lines, line_num)
+
+          symbols << SymbolInfo.new(full_name, "Struct", "struct", file_path, line_num, line.strip, doc)
+
+          current_namespace.push(struct_name)
+        elsif match = line.match(/^\s*enum\s+(\w+)/)
+          enum_name = match[1]
+          full_name = (current_namespace + [enum_name]).join("::")
+          doc = extract_documentation(lines, line_num)
+
+          symbols << SymbolInfo.new(full_name, "Enum", "enum", file_path, line_num, line.strip, doc)
+
+          current_namespace.push(enum_name)
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.any?
-        elsif match = line.match(/^\s*def\s+(\w+)(?:\([^)]*\))?\s*:\s*(\w+)/)
+        elsif match = line.match(/^\s*def\s+(?:self\.)?(\w+)(?:\([^)]*\))?\s*(?::\s*(\w+))?/)
           method_name = match[1]
-          return_type = match[2]
+          return_type = match[2]? || "Void"
+          full_method_name = current_namespace.empty? ? method_name : (current_namespace.join("::") + "::" + method_name)
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(method_name, return_type, "method", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
         end
       end
 
