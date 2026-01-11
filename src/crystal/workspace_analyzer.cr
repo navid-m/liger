@@ -375,7 +375,6 @@ module Liger
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.any?
         elsif match = line.match(/^\s*def\s+(\w+)(?:\([^)]*\))?\s*:\s*(\w+)/)
-          # Only scan public methods
           method_name = match[1]
           return_type = match[2]
           doc = extract_documentation(lines, line_num)
