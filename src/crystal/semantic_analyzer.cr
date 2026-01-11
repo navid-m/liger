@@ -395,18 +395,25 @@ module Liger
           position.line,
           position.character - partial_method.size - 1
         )
-        if receiver_type = @workspace_analyzer.get_type_at_position(uri, source, receiver_pos)
-          completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
-          completions.each do |method_name|
-            if method_name.starts_with?(partial_method)
-              items << LSP::CompletionItem.new(
-                method_name,
-                LSP::CompletionItemKind::Method,
-                "#{receiver_type} method"
-              )
-            end
-          end
-        elsif receiver_type = find_variable_type_in_source(source, receiver, position.line)
+
+        receiver_type = nil
+        if @enable_type_aware_completion
+          receiver_type = get_type_via_crystal_tool(uri, source, receiver_pos)
+        end
+
+        unless receiver_type
+          receiver_type = @workspace_analyzer.get_type_at_position(uri, source, receiver_pos)
+        end
+
+        unless receiver_type
+          receiver_type = find_variable_type_in_source(source, receiver, position.line)
+        end
+
+        unless receiver_type
+          receiver_type = infer_type_from_constant_name(receiver)
+        end
+
+        if receiver_type
           completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
           completions.each do |method_name|
             if method_name.starts_with?(partial_method)
@@ -1078,13 +1085,24 @@ module Liger
       var_name : String,
       current_line : Int32,
     ) : String?
-      # Use cached lines if available
       lines = @source_lines_cache.values.first? || source.split('\n')
+
+      if var_name[0].uppercase?
+        lines.each do |line|
+          if match = line.match(/^\s*#{Regex.escape(var_name)}\s*:\s*(\w+(?:::\w+)?)\s*=/)
+            return match[1]
+          end
+          if match = line.match(/^\s*#{Regex.escape(var_name)}\s*=\s*(.+)/)
+            assignment = match[1].strip
+            return infer_type_from_assignment(assignment)
+          end
+        end
+      end
 
       (0...current_line).reverse_each do |line_num|
         line = lines[line_num]
 
-        if match = line.match(/#{Regex.escape(var_name)}\s*:\s*(\w+)\s*=/)
+        if match = line.match(/#{Regex.escape(var_name)}\s*:\s*(\w+(?:::\w+)?)\s*=/)
           return match[1]
         end
         if match = line.match(/#{Regex.escape(var_name)}\s*=\s*(.+)/)
@@ -1101,35 +1119,110 @@ module Liger
 
       return "String" if value.starts_with?('"') || value.starts_with?("'")
       return "Int32" if value.match(/^\d+$/)
+      return "Int64" if value.match(/^\d+_i64$/) || value.match(/^\d+i64$/)
       return "Float64" if value.match(/^\d+\.\d+$/)
       return "Bool" if value == "true" || value == "false"
       return "Nil" if value == "nil"
       return "Array" if value.starts_with?('[')
       return "Hash" if value.starts_with?('{')
       return "Regex" if value.starts_with?('/')
+      return "Symbol" if value.starts_with?(':')
+      return "Range" if value.match(/\d+\.\.\d+/)
+      return "Proc" if value.starts_with?("->")
 
       if match = value.match(/(\w+)\.(\w+)/)
         method = match[2]
         case method
-        when "to_s"           then return "String"
-        when "to_i"           then return "Int32"
-        when "to_f"           then return "Float64"
-        when "size", "length" then return "Int32"
-        when "empty?"         then return "Bool"
-        when "split"          then return "Array(String)"
-        when "chars"          then return "Array(Char)"
+        when "to_s"                                 then return "String"
+        when "to_i"                                 then return "Int32"
+        when "to_f"                                 then return "Float64"
+        when "size", "length"                       then return "Int32"
+        when "empty?"                               then return "Bool"
+        when "split"                                then return "Array(String)"
+        when "chars"                                then return "Array(Char)"
+        when "keys"                                 then return "Array"
+        when "values"                               then return "Array"
+        when "upcase", "downcase", "strip", "chomp" then return "String"
+        when "first", "last"                        then return "Object"
+        when "map", "select", "reject"              then return "Array"
         end
       end
 
-      if match = value.match(/(\w+)\.new/)
+      if match = value.match(/(\w+(?:::\w+)*)\.new/)
         return match[1]
       end
 
-      if match = value.match(/(\w+)\.from_json/)
+      if match = value.match(/(\w+(?:::\w+)*)\.from_json/)
         return match[1]
+      end
+
+      if value.match(/^(\w+(?:::\w+)*)\(/)
+        if match = value.match(/^(\w+(?:::\w+)*)\(/)
+          return match[1]
+        end
       end
 
       "Object"
+    end
+
+    private def get_type_via_crystal_tool(uri : String, source : String, position : LSP::Position) : String?
+      filename = uri_to_filename(uri)
+      line = position.line + 1
+      column = position.character + 1
+
+      begin
+        cursor_loc = "#{filename}:#{line}:#{column}"
+        output_io = IO::Memory.new
+        error_io = IO::Memory.new
+
+        if source_hash = source.hash
+          if @last_saved_hashes[uri]? != source_hash
+            File.write(filename, source)
+            @last_saved_hashes[uri] = source_hash
+          end
+        end
+
+        Process.run("crystal", ["tool", "context", "-c", cursor_loc, filename],
+          output: output_io,
+          error: error_io)
+
+        output = output_io.to_s.strip
+
+        if match = output.match(/:\s*(\w+(?:::\w+)*)/)
+          return match[1]
+        end
+      rescue
+      end
+
+      nil
+    end
+
+    private def infer_type_from_constant_name(constant_name : String) : String?
+      case constant_name
+      when "PROGRAM_NAME", "ARGV_UNSAFE"
+        "String"
+      when "ARGV"
+        "Array(String)"
+      when "STDIN"
+        "IO::FileDescriptor"
+      when "STDOUT", "STDERR"
+        "IO::FileDescriptor"
+      when "ENV"
+        "ENV"
+      when "CRYSTAL_VERSION"
+        "String"
+      else
+        if constant_name.ends_with?("_PATH") || constant_name.ends_with?("_DIR") ||
+           constant_name.ends_with?("_FILE") || constant_name.ends_with?("_NAME")
+          "String"
+        elsif constant_name.ends_with?("_COUNT") || constant_name.ends_with?("_SIZE")
+          "Int32"
+        elsif constant_name.ends_with?("_ENABLED") || constant_name.starts_with?("IS_")
+          "Bool"
+        else
+          nil
+        end
+      end
     end
 
     private def get_hover_from_workspace(
