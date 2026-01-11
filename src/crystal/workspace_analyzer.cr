@@ -7,8 +7,10 @@ module Liger
     @file_cache = Hash(String, String).new
     @symbol_cache = Hash(String, Array(SymbolInfo)).new
     @stdlib_cache = Hash(String, Array(SymbolInfo)).new
+    @lib_cache = Hash(String, Array(SymbolInfo)).new
     @last_scan_time : Time?
     @stdlib_scanned = false
+    @lib_scanned = false
 
     struct SymbolInfo
       property name : String
@@ -221,12 +223,9 @@ module Liger
       results = [] of SymbolInfo
       search_pattern = "#{namespace}::"
 
-      # Search workspace symbols
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
-          # Match symbols that start with namespace::
           if symbol.name.starts_with?(search_pattern)
-            # Extract just the immediate child (not nested)
             remainder = symbol.name[search_pattern.size..-1]
             unless remainder.includes?("::")
               results << symbol
@@ -235,7 +234,6 @@ module Liger
         end
       end
 
-      # Also search stdlib
       scan_stdlib_if_needed
       @stdlib_cache.each_value do |symbols|
         symbols.each do |symbol|
@@ -322,10 +320,65 @@ module Liger
 
       STDERR.puts "Scanning workspace: #{workspace_path}"
       @symbol_cache.clear
-      scan_directory(workspace_path)
+
+      scan_directory(workspace_path, 0, exclude_lib: true)
+
+      unless @lib_scanned
+        lib_path = File.join(workspace_path, "lib")
+        if Dir.exists?(lib_path)
+          STDERR.puts "Scanning lib directory (one-time): #{lib_path}"
+          scan_lib_directory(lib_path)
+          @lib_scanned = true
+          File.write("/tmp/liger_logs.log", "=== Lib symbols cached ===\n", mode: "a")
+          @lib_cache.each do |file, symbols|
+            symbols.each do |symbol|
+              if symbol.kind == "method"
+                File.write("/tmp/liger_logs.log", "  Method: #{symbol.name} in #{file}:#{symbol.line}\n", mode: "a")
+              end
+            end
+          end
+        end
+      end
 
       @last_scan_time = Time.utc
-      STDERR.puts "Workspace scan complete. Found #{@symbol_cache.values.sum(&.size)} symbols"
+      total_symbols = @symbol_cache.values.sum(&.size) + @lib_cache.values.sum(&.size)
+      STDERR.puts "Workspace scan complete. Found #{total_symbols} symbols"
+    end
+
+    private def scan_lib_directory(lib_path : String)
+      Dir.each_child(lib_path) do |entry|
+        shard_path = File.join(lib_path, entry)
+        next unless Dir.exists?(shard_path)
+
+        src_path = File.join(shard_path, "src")
+        if Dir.exists?(src_path)
+          scan_directory_for_lib(src_path, 0)
+        end
+      end
+    end
+
+    private def scan_directory_for_lib(path : String, depth : Int32)
+      return if depth > 3
+
+      Dir.each_child(path) do |entry|
+        full_path = File.join(path, entry)
+
+        if Dir.exists?(full_path)
+          scan_directory_for_lib(full_path, depth + 1)
+        elsif entry.ends_with?(".cr")
+          scan_file_for_lib(full_path)
+        end
+      end
+    end
+
+    private def scan_file_for_lib(file_path : String)
+      return unless File.exists?(file_path)
+
+      scan_file(file_path)
+
+      if symbols = @symbol_cache.delete(file_path)
+        @lib_cache[file_path] = symbols
+      end
     end
 
     private def scan_stdlib_if_needed
@@ -454,13 +507,17 @@ module Liger
       nil
     end
 
-    private def scan_directory(path : String)
+    private def scan_directory(path : String, depth : Int32 = 0, exclude_lib : Bool = false)
+      return if depth > 10
+
       Dir.each_child(path) do |entry|
         full_path = File.join(path, entry)
 
         if Dir.exists?(full_path)
-          next if entry.starts_with?('.') || entry == "lib" || entry == "bin"
-          scan_directory(full_path)
+          next if entry.starts_with?('.') || entry == "bin"
+          next if exclude_lib && entry == "lib"
+
+          scan_directory(full_path, depth + 1, exclude_lib)
         elsif entry.ends_with?(".cr")
           scan_file(full_path)
         end
@@ -617,33 +674,47 @@ module Liger
       current_class = nil
       current_module = nil
       current_namespace = [] of String
+      namespace_indent_levels = [] of Int32
 
       lines.each_with_index do |line, line_num|
+        line_indent = line.size - line.lstrip.size
+
         if match = line.match(/^\s*class\s+(\w+)(?:\s*<\s*(\w+))?/)
           current_class = match[1]
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [current_class]).join("::")
           doc = extract_documentation(lines, line_num)
+          File.write("/tmp/liger_logs.log", "Found class #{current_class} at #{file_path}:#{line_num}, namespace: #{current_namespace.inspect}\n", mode: "a") if file_path.includes?("crystglfw")
           symbols << SymbolInfo.new(
             current_class, parent_class, "class", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
             full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(current_class)
+          namespace_indent_levels.push(line_indent)
         elsif match = line.match(/^\s*module\s+(\w+)/)
           current_module = match[1]
           full_name = (current_namespace + [current_module]).join("::")
           doc = extract_documentation(lines, line_num)
+          File.write("/tmp/liger_logs.log", "Found module #{current_module} at #{file_path}:#{line_num}, indent: #{line_indent}, namespace: #{current_namespace.inspect}\n", mode: "a") if file_path.includes?("crystglfw")
           symbols << SymbolInfo.new(current_module, "Module", "module", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
             full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(current_module)
+          namespace_indent_levels.push(line_indent)
         elsif line.match(/^\s*end\s*$/)
-          if current_namespace.any?
-            popped = current_namespace.pop
-            if popped == current_class
-              current_class = nil
-            elsif popped == current_module
-              current_module = nil
+          if current_namespace.any? && namespace_indent_levels.any?
+            last_indent = namespace_indent_levels.last
+            if line_indent <= last_indent
+              popped = current_namespace.pop
+              namespace_indent_levels.pop
+              File.write("/tmp/liger_logs.log", "Popped #{popped} from namespace at #{file_path}:#{line_num}, indent: #{line_indent} <= #{last_indent}, remaining: #{current_namespace.inspect}\n", mode: "a") if file_path.includes?("crystglfw")
+              if popped == current_class
+                current_class = nil
+              elsif popped == current_module
+                current_module = nil
+              end
+            else
+              File.write("/tmp/liger_logs.log", "Skipping end at #{file_path}:#{line_num}, indent: #{line_indent} > #{last_indent} (block end, not module/class end)\n", mode: "a") if file_path.includes?("crystglfw")
             end
           end
         end
@@ -713,34 +784,41 @@ module Liger
         end
 
         # Method definitions with return types
-        if match = line.match(/^\s*def\s+(\w+)(?:\([^)]*\))?\s*:\s*(\w+)/)
+        if match = line.match(/^\s*def\s+(?:self\.)?(\w+)(?:\([^)]*\))?\s*:\s*(\w+)/)
           method_name = match[1]
           return_type = match[2]
           containing_type = current_namespace.join("::") || "Object"
+          full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(method_name, return_type, "method", file_path, line_num, line.strip, doc)
-        elsif match = line.match(/^\s*def\s+(\w+)(?:\([^)]*\))?/)
+          # Store with full name if inside a namespace
+          File.write("/tmp/liger_logs.log", "Method '#{method_name}' at #{file_path}:#{line_num}, namespace: #{current_namespace.inspect}, storing as: #{full_method_name}\n", mode: "a") if file_path.includes?("crystglfw") && method_name == "poll_events"
+          symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
+        elsif match = line.match(/^\s*def\s+(?:self\.)?(\w+)(?:\([^)]*\))?/)
           method_name = match[1]
           # Try to infer return type from method body
           return_type = infer_method_return_type(lines, line_num)
           containing_type = current_namespace.join("::") || "Object"
+          full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(method_name, return_type, "method", file_path, line_num, line.strip, doc)
+          File.write("/tmp/liger_logs.log", "Method '#{method_name}' at #{file_path}:#{line_num}, namespace: #{current_namespace.inspect}, storing as: #{full_method_name}\n", mode: "a") if file_path.includes?("crystglfw") && method_name == "poll_events"
+          symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
         end
 
         # Private method definitions
-        if match = line.match(/^\s*private\s+def\s+(\w+)(?:\([^)]*\))?\s*:\s*(\w+)/)
+        if match = line.match(/^\s*private\s+def\s+(?:self\.)?(\w+)(?:\([^)]*\))?\s*:\s*(\w+)/)
           method_name = match[1]
           return_type = match[2]
           containing_type = current_namespace.join("::") || "Object"
+          full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(method_name, return_type, "method", file_path, line_num, line.strip, doc)
-        elsif match = line.match(/^\s*private\s+def\s+(\w+)(?:\([^)]*\))?/)
+          symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
+        elsif match = line.match(/^\s*private\s+def\s+(?:self\.)?(\w+)(?:\([^)]*\))?/)
           method_name = match[1]
           return_type = infer_method_return_type(lines, line_num)
           containing_type = current_namespace.join("::") || "Object"
+          full_method_name = current_namespace.empty? ? method_name : "#{current_namespace.join("::")}::#{method_name}"
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(method_name, return_type, "method", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(full_method_name, return_type, "method", file_path, line_num, line.strip, doc)
         end
 
         # Variable assignments with explicit types
@@ -1009,17 +1087,40 @@ module Liger
     def find_method_definition(receiver_type : String, method_name : String) : SymbolInfo?
       scan_workspace_if_needed
 
+      File.write("/tmp/liger_logs.log", "=== find_method_definition ===\n", mode: "a")
+      File.write("/tmp/liger_logs.log", "Looking for method '#{method_name}' on receiver '#{receiver_type}'\n", mode: "a")
+      File.write("/tmp/liger_logs.log", "Total workspace symbols: #{@symbol_cache.values.sum(&.size)}\n", mode: "a")
+      File.write("/tmp/liger_logs.log", "Total lib symbols: #{@lib_cache.values.sum(&.size)}\n", mode: "a")
+
+      full_method_name = "#{receiver_type}::#{method_name}"
+
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
-          if symbol.kind == "method" && symbol.name == method_name
-            if symbol.type.includes?(receiver_type) || receiver_type.includes?(symbol.type) ||
-               is_method_available_for_type(symbol, receiver_type)
-              return symbol
+          if symbol.kind == "method"
+            if symbol.name == full_method_name || symbol.name.ends_with?("::#{method_name}")
+              if symbol.name.includes?(receiver_type)
+                File.write("/tmp/liger_logs.log", "Found method in workspace: #{symbol.name} in #{symbol.file}:#{symbol.line}\n", mode: "a")
+                return symbol
+              end
             end
           end
         end
       end
 
+      @lib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.kind == "method"
+            if symbol.name == full_method_name || symbol.name.ends_with?("::#{method_name}")
+              if symbol.name.includes?(receiver_type)
+                File.write("/tmp/liger_logs.log", "Found method in lib: #{symbol.name} in #{symbol.file}:#{symbol.line}\n", mode: "a")
+                return symbol
+              end
+            end
+          end
+        end
+      end
+
+      File.write("/tmp/liger_logs.log", "Method not found\n", mode: "a")
       nil
     end
 
