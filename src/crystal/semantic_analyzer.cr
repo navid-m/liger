@@ -694,7 +694,11 @@ module Liger
     end
 
     # Handle goto definition for require statements
-    private def handle_require_definition(line : String, position : LSP::Position, uri : String) : LSP::Location?
+    private def handle_require_definition(
+      line : String,
+      position : LSP::Position,
+      uri : String,
+    ) : LSP::Location?
       return nil unless line.strip.starts_with?("require")
 
       if match = line.match(/require\s+["']([^"']+)["']/)
