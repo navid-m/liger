@@ -56,6 +56,10 @@ module LSP
     Warning     = 2
     Information = 3
     Hint        = 4
+
+    def to_json(json : JSON::Builder)
+      json.number(self.value)
+    end
   end
 
   # Diagnostic message
@@ -263,6 +267,10 @@ module LSP
     Event         = 24
     Operator      = 25
     TypeParameter = 26
+
+    def to_json(json : JSON::Builder)
+      json.number(self.value)
+    end
   end
 
   # Document symbol
