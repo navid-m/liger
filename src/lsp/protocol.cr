@@ -27,7 +27,7 @@ module LSP
     include JSON::Serializable
 
     property start : Position
-    
+
     @[JSON::Field(key: "end")]
     property ending : Position
 
@@ -148,7 +148,12 @@ module LSP
     property version : Int32
     property text : String
 
-    def initialize(@uri : DocumentUri, @language_id : String, @version : Int32, @text : String)
+    def initialize(
+      @uri : DocumentUri,
+      @language_id : String,
+      @version : Int32,
+      @text : String,
+    )
     end
   end
 
@@ -211,7 +216,11 @@ module LSP
     property? commit_characters : Array(String)?
     property? data : JSON::Any?
 
-    def initialize(@label : String, @kind : CompletionItemKind? = nil, @detail : String? = nil)
+    def initialize(
+      @label : String,
+      @kind : CompletionItemKind? = nil,
+      @detail : String? = nil,
+    )
     end
   end
 
