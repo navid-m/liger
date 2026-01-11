@@ -64,8 +64,8 @@ module LSP
     private def apply_incremental_change(range : Range, new_text : String)
       start_line = range.start.line
       start_char = range.start.character
-      end_line = range.end.line
-      end_char = range.end.character
+      end_line = range.ending.line
+      end_char = range.ending.character
       before = ""
       if start_line > 0
         before = @lines[0...start_line].join('\n') + '\n'

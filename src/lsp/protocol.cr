@@ -27,13 +27,13 @@ module LSP
     include JSON::Serializable
 
     property start : Position
-    property end : Position
+    property ending : Position
 
-    def initialize(@start : Position, @end : Position)
+    def initialize(@start : Position, @ending : Position)
     end
 
     def contains?(position : Position)
-      position >= @start && position <= @end
+      position >= @start && position <= @ending
     end
   end
 
