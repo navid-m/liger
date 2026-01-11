@@ -471,9 +471,11 @@ module Liger
           module_name = match[1]
           full_name = (current_namespace + [module_name]).join("::")
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(module_name, "Module", "module", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
+            module_name, "Module", "module", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(
+            full_name, "Module", "module", file_path, line_num, line.strip, doc
+          ) if current_namespace.any?
           current_namespace.push(module_name)
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.any?
