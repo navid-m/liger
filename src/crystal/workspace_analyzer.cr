@@ -214,7 +214,8 @@ module Liger
           full_name = (current_namespace + [module_name]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(module_name, "Module", "module", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(module_name)
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.any?
@@ -233,7 +234,8 @@ module Liger
         full_name = (current_namespace + [enum_name]).join("::")
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new(enum_name, "Enum", "enum", file_path, line_num, line.strip, doc)
-        symbols << SymbolInfo.new(full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.any?
+        symbols << SymbolInfo.new(
+          full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.any?
       end
 
       # Struct definitions
@@ -242,7 +244,8 @@ module Liger
         full_name = (current_namespace + [struct_name]).join("::")
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new(struct_name, "Struct", "struct", file_path, line_num, line.strip, doc)
-        symbols << SymbolInfo.new(full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.any?
+        symbols << SymbolInfo.new(
+          full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.any?
       end
 
       # Method definitions
@@ -271,7 +274,8 @@ module Liger
         var_name = "@#{match[1]}"
         var_type = match[2]
         doc = extract_documentation(lines, line_num)
-        symbols << SymbolInfo.new(var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc)
+        symbols << SymbolInfo.new(
+          var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc)
       end
 
       # Constants
@@ -282,7 +286,8 @@ module Liger
         full_name = (current_namespace + [const_name]).join("::")
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new(const_name, const_type, "constant", file_path, line_num, line.strip, doc)
-        symbols << SymbolInfo.new(full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.any?
+        symbols << SymbolInfo.new(
+          full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.any?
       end
     end
 
@@ -304,15 +309,18 @@ module Liger
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [current_class]).join("::")
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(current_class, parent_class, "class", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            current_class, parent_class, "class", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(
+            full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(current_class)
         elsif match = line.match(/^\s*module\s+(\w+)/)
           current_module = match[1]
           full_name = (current_namespace + [current_module]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(current_module, "Module", "module", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(current_module)
         elsif line.match(/^\s*end\s*$/)
           if current_namespace.any?
@@ -331,7 +339,8 @@ module Liger
           full_name = (current_namespace + [enum_name]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(enum_name, "Enum", "enum", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.any?
         end
 
         # Struct definitions
@@ -340,7 +349,8 @@ module Liger
           full_name = (current_namespace + [struct_name]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(struct_name, "Struct", "struct", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.any?
         end
 
         # Alias definitions
@@ -350,7 +360,8 @@ module Liger
           full_name = (current_namespace + [alias_name]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(alias_name, alias_type, "alias", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, alias_type, "alias", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name, alias_type, "alias", file_path, line_num, line.strip, doc) if current_namespace.any?
         end
 
         # Constants
@@ -361,7 +372,8 @@ module Liger
           full_name = (current_namespace + [const_name]).join("::")
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(const_name, const_type, "constant", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(
+            full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.any?
         end
 
         # Property declarations (property, getter, setter)
@@ -429,7 +441,15 @@ module Liger
           var_name = "@#{match[1]}"
           var_type = match[2]
           doc = extract_documentation(lines, line_num)
-          symbols << SymbolInfo.new(var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(
+            var_name,
+            var_type,
+            "instance_variable",
+            file_path,
+            line_num,
+            line.strip,
+            doc
+          )
         end
       end
 
