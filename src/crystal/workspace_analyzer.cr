@@ -487,6 +487,32 @@ module Liger
           symbols << SymbolInfo.new(full_name, "Enum", "enum", file_path, line_num, line.strip, doc)
 
           current_namespace.push(enum_name)
+        elsif match = line.match(/^\s*lib\s+(\w+)/)
+          # Track lib declarations for extern function bindings
+          lib_name = match[1]
+          full_name = (current_namespace + [lib_name]).join("::")
+          doc = extract_documentation(lines, line_num)
+          
+          symbols << SymbolInfo.new(full_name, "Lib", "lib", file_path, line_num, line.strip, doc)
+          current_namespace.push(lib_name)
+        elsif match = line.match(/^\s*fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
+          # Track extern function declarations inside lib blocks
+          fun_name = match[1]
+          c_name = match[2]? || fun_name
+          params = match[3]? || "()"
+          return_type = match[4]? || "Void"
+          
+          # Store with lib namespace prefix
+          full_name = current_namespace.empty? ? fun_name : (current_namespace.join("::") + "::" + fun_name)
+          
+          # Build signature for display
+          signature = "fun #{fun_name}"
+          signature += " = #{c_name}" if c_name != fun_name
+          signature += params
+          signature += " : #{return_type.strip}" unless return_type.strip.empty?
+          
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc)
         elsif match = line.match(/^\s*annotation\s+(\w+)/)
           current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
@@ -599,6 +625,31 @@ module Liger
             full_name, "Module", "module", file_path, line_num, line.strip, doc
           ) if current_namespace.any?
           current_namespace.push(module_name)
+        elsif match = line.match(/^\s*lib\s+(\w+)/)
+          lib_name = match[1]
+          full_name = (current_namespace + [lib_name]).join("::")
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(lib_name, "Lib", "lib", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(
+            full_name, "Lib", "lib", file_path, line_num, line.strip, doc
+          ) if current_namespace.any?
+          current_namespace.push(lib_name)
+        elsif match = line.match(/^\s*fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
+          fun_name = match[1]
+          c_name = match[2]? || fun_name
+          params = match[3]? || "()"
+          return_type = match[4]? || "Void"
+          
+          full_name = current_namespace.empty? ? fun_name : (current_namespace.join("::") + "::" + fun_name)
+          
+          signature = "fun #{fun_name}"
+          signature += " = #{c_name}" if c_name != fun_name
+          signature += params
+          signature += " : #{return_type.strip}" unless return_type.strip.empty?
+          
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
+          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.any?
         elsif match = line.match(/^\s*annotation\s+(\w+)/)
           current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
@@ -718,6 +769,31 @@ module Liger
             full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
           current_namespace.push(current_module)
           namespace_indent_levels.push(line_indent)
+        elsif match = line.match(/^\s*lib\s+(\w+)/)
+          lib_name = match[1]
+          full_name = (current_namespace + [lib_name]).join("::")
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(lib_name, "Lib", "lib", file_path, line_num, line.strip, doc)
+          symbols << SymbolInfo.new(
+            full_name, "Lib", "lib", file_path, line_num, line.strip, doc) if current_namespace.any?
+          current_namespace.push(lib_name)
+          namespace_indent_levels.push(line_indent)
+        elsif match = line.match(/^\s*fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
+          fun_name = match[1]
+          c_name = match[2]? || fun_name
+          params = match[3]? || "()"
+          return_type = match[4]? || "Void"
+          
+          full_name = current_namespace.empty? ? fun_name : (current_namespace.join("::") + "::" + fun_name)
+          
+          signature = "fun #{fun_name}"
+          signature += " = #{c_name}" if c_name != fun_name
+          signature += params
+          signature += " : #{return_type.strip}" unless return_type.strip.empty?
+          
+          doc = extract_documentation(lines, line_num)
+          symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
+          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.any?
         elsif match = line.match(/^\s*annotation\s+(\w+)/)
           current_namespace.push("__annotation__")
           namespace_indent_levels.push(line_indent)

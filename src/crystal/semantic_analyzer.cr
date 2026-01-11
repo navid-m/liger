@@ -145,6 +145,24 @@ module Liger
       if dot_pos = find_dot_in_line(line_text, position.character)
         receiver_word = extract_word_before_dot(line_text, dot_pos)
         if receiver_word
+          # Check if this is a lib function call (e.g., GL.clear)
+          if lib_symbol = @workspace_analyzer.find_symbol_info(receiver_word)
+            if lib_symbol.kind == "lib"
+              # Look for the function within this lib
+              fun_qualified_name = "#{receiver_word}::#{word}"
+              if fun_symbol = @workspace_analyzer.find_symbol_info(fun_qualified_name)
+                if fun_symbol.kind == "fun"
+                  def_uri = filename_to_uri(fun_symbol.file)
+                  range = LSP::Range.new(
+                    LSP::Position.new(fun_symbol.line, 0),
+                    LSP::Position.new(fun_symbol.line, word.size)
+                  )
+                  return LSP::Location.new(def_uri, range)
+                end
+              end
+            end
+          end
+          
           receiver_type = @workspace_analyzer.get_type_at_position(
             uri,
             source,
@@ -328,6 +346,38 @@ module Liger
 
       line_text = lines[position.line]
       prefix = line_text[0...position.character]
+
+      # Check for lib function calls (e.g., GL.clear()
+      if match = prefix.match(/(\w+)\.(\w+)\s*\([^)]*$/)
+        lib_name = match[1]
+        fun_name = match[2]
+        
+        if lib_symbol = @workspace_analyzer.find_symbol_info(lib_name)
+          if lib_symbol.kind == "lib"
+            fun_qualified_name = "#{lib_name}::#{fun_name}"
+            if fun_symbol = @workspace_analyzer.find_symbol_info(fun_qualified_name)
+              if fun_symbol.kind == "fun"
+                if sig = fun_symbol.signature
+                  signature_info = LSP::SignatureInformation.new(
+                    sig,
+                    fun_symbol.documentation
+                  )
+                  
+                  paren_start = match.begin(0).not_nil! + match[0].index('(').not_nil!
+                  text_after_paren = prefix[paren_start..-1]
+                  param_index = text_after_paren.count(',')
+                  
+                  return LSP::SignatureHelp.new(
+                    [signature_info],
+                    0,
+                    param_index
+                  )
+                end
+              end
+            end
+          end
+        end
+      end
 
       if match = prefix.match(/(\w+)\s*\([^)]*$/)
         method_name = match[1]
@@ -1281,6 +1331,25 @@ module Liger
       if dot_pos = find_dot_in_line(line_text, position.character)
         receiver_word = extract_word_before_dot(line_text, dot_pos)
         if receiver_word
+          # Check if this is a lib function call (e.g., GL.clear)
+          if lib_symbol = @workspace_analyzer.find_symbol_info(receiver_word)
+            if lib_symbol.kind == "lib"
+              # Look for the function within this lib
+              fun_qualified_name = "#{receiver_word}::#{word}"
+              if fun_symbol = @workspace_analyzer.find_symbol_info(fun_qualified_name)
+                if fun_symbol.kind == "fun" && fun_symbol.signature
+                  content = "**Extern Function**\n\n"
+                  content += "```crystal\n#{fun_symbol.signature}\n```"
+                  if doc = fun_symbol.documentation
+                    content += "\n\n---\n\n#{doc}"
+                  end
+                  content += "\n\n*C library binding*"
+                  return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+                end
+              end
+            end
+          end
+          
           receiver_type = @workspace_analyzer.get_type_at_position(
             uri,
             source,
@@ -1328,6 +1397,17 @@ module Liger
                     else
                       "```crystal\ndef #{symbol.name} : #{symbol.type}\n```"
                     end
+                  when "fun"
+                    fun_content = "**Extern Function**\n\n"
+                    if signature = symbol.signature
+                      fun_content += "```crystal\n#{signature}\n```"
+                    else
+                      fun_content += "```crystal\nfun #{symbol.name} : #{symbol.type}\n```"
+                    end
+                    fun_content += "\n\n*C library binding*"
+                    fun_content
+                  when "lib"
+                    "```crystal\nlib #{symbol.name}\n```\n\n*C library declaration*"
                   when "class"
                     class_content = "```crystal\nclass #{symbol.name} < #{symbol.type}\n```"
                     if members = @workspace_analyzer.get_class_members(symbol.name)
