@@ -21,10 +21,12 @@ describe LSP::TextDocument do
         "file:///test.cr",
         "crystal",
         1,
-        "def test\nend"
+        "def  test\nend"
       )
 
-      word = doc.get_word_at_position(LSP::Position.new(0, 3))
+      word = doc.get_word_at_position(LSP::Position.new(0, 4))
+      word.should be_nil
+      word = doc.get_word_at_position(LSP::Position.new(1, 10))
       word.should be_nil
     end
 

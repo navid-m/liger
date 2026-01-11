@@ -22,18 +22,20 @@ def print_help
   puts "  --help       Show this help message"
 end
 
-if ARGV.includes?("--version")
-  print_version
-  exit 0
-elsif ARGV.includes?("--help")
-  print_help
-  exit 0
-end
+if PROGRAM_NAME.includes?("liger")
+  if ARGV.includes?("--version") || ARGV.includes?("-v")
+    print_version
+    exit 0
+  elsif ARGV.includes?("--help") || ARGV.includes?("-h")
+    print_help
+    exit 0
+  end
 
-begin
-  server = LSP::Server.new
-  server.run
-rescue exception
-  STDERR.puts "Server crashed: #{exception.message}"
-  STDERR.flush
+  begin
+    server = LSP::Server.new
+    server.run
+  rescue exception
+    STDERR.puts "Server crashed: #{exception.message}"
+    STDERR.flush
+  end
 end
