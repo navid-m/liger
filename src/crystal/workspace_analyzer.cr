@@ -181,7 +181,7 @@ module Liger
 
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
-          if symbol.name.ends_with?("::#{symbol_name}") || symbol.name.ends_with?(symbol_name)
+          if symbol.name.ends_with?("::#{symbol_name}")
             STDERR.puts "Found partial match in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
             return symbol
           end
@@ -201,7 +201,7 @@ module Liger
 
       @stdlib_cache.each_value do |symbols|
         symbols.each do |symbol|
-          if symbol.name.ends_with?("::#{symbol_name}") || symbol.name.ends_with?(symbol_name)
+          if symbol.name.ends_with?("::#{symbol_name}")
             STDERR.puts "Found partial match in stdlib: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
             return symbol
           end

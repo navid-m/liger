@@ -90,21 +90,26 @@ module Liger
 
     def find_definition(uri : String, position : LSP::Position) : LSP::Location?
       source = @sources[uri]?
+      File.write("/tmp/liger_logs.log", "find_definition: source is nil\n", mode: "a") unless source
       return nil unless source
 
       lines = source.split('\n')
+      File.write("/tmp/liger_logs.log", "find_definition: position.line #{position.line} >= lines.size #{lines.size}\n", mode: "a") if position.line >= lines.size
       return nil if position.line >= lines.size
 
       line_text = lines[position.line]
       word = extract_word_at_position(line_text, position.character)
+      File.write("/tmp/liger_logs.log", "find_definition: extracted word '#{word}' from line '#{line_text}' at char #{position.character}\n", mode: "a")
       return nil unless word
 
       STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}"
 
       if location = find_definition_in_current_file(source, word, uri)
         STDERR.puts "Found definition in current file"
+        File.write("/tmp/liger_logs.log", "find_definition: found in current file\n", mode: "a")
         return location
       end
+      File.write("/tmp/liger_logs.log", "find_definition: not found in current file\n", mode: "a")
 
       if symbol = @workspace_analyzer.find_symbol_info(word)
         STDERR.puts "Found symbol in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
@@ -582,8 +587,18 @@ module Liger
     private def extract_word_at_position(line : String, char : Int32) : String?
       return nil if char < 0 || char > line.size
       start_pos = char
-      while start_pos > 0 && word_char?(line[start_pos - 1])
-        start_pos -= 1
+
+      if char > 0 && line[char - 1] == '@'
+        start_pos = char - 1
+      elsif char < line.size && line[char] == '@'
+        start_pos = char
+      else
+        while start_pos > 0 && word_char?(line[start_pos - 1])
+          start_pos -= 1
+        end
+        if start_pos > 0 && line[start_pos - 1] == '@'
+          start_pos -= 1
+        end
       end
 
       end_pos = char
@@ -973,6 +988,14 @@ module Liger
       lines = source.split('\n')
 
       lines.each_with_index do |line, line_num|
+        if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*[=:]/)
+          range = LSP::Range.new(
+            LSP::Position.new(line_num, match.begin(1).not_nil!),
+            LSP::Position.new(line_num, match.end(1).not_nil!)
+          )
+          return LSP::Location.new(uri, range)
+        end
+
         # Method definitions
         if match = line.match(/^\s*def\s+(#{Regex.escape(symbol_name)})(?:\(|$|\s)/)
           range = LSP::Range.new(
@@ -1002,6 +1025,15 @@ module Liger
 
         # Module definitions
         if match = line.match(/^\s*module\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
+          range = LSP::Range.new(
+            LSP::Position.new(line_num, match.begin(1).not_nil!),
+            LSP::Position.new(line_num, match.end(1).not_nil!)
+          )
+          return LSP::Location.new(uri, range)
+        end
+
+        # Instance variable definitions
+        if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*[=:]/)
           range = LSP::Range.new(
             LSP::Position.new(line_num, match.begin(1).not_nil!),
             LSP::Position.new(line_num, match.end(1).not_nil!)
