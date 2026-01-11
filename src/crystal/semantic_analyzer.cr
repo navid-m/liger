@@ -1307,6 +1307,36 @@ module Liger
       word = extract_word_at_position(line_text, position.character)
       return nil unless word
 
+      if dot_pos = find_dot_in_line(line_text, position.character)
+        receiver_word = extract_word_before_dot(line_text, dot_pos)
+        if receiver_word
+          receiver_type = @workspace_analyzer.get_type_at_position(
+            uri,
+            source,
+            LSP::Position.new(position.line, dot_pos - 1)
+          )
+          if receiver_type
+            if symbol = @workspace_analyzer.find_method_definition(receiver_type, word)
+              content = case symbol.kind
+                        when "method"
+                          if signature = symbol.signature
+                            sig_content = "```crystal\n#{signature}\n```"
+                            if doc = symbol.documentation
+                              sig_content += "\n\n---\n\n#{doc}"
+                            end
+                            sig_content
+                          else
+                            "```crystal\ndef #{word} : #{symbol.type}\n```"
+                          end
+                        else
+                          "```crystal\n#{symbol.signature}\n```"
+                        end
+              return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+            end
+          end
+        end
+      end
+
       if signature = find_signature_in_current_file(source, word)
         if signature.includes?("\n\n")
           parts = signature.split("\n\n", 2)
