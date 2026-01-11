@@ -90,7 +90,11 @@ module Liger
       members.empty? ? nil : members.join("\n")
     end
 
-    private def extract_type_members(content : String, type_name : String, type_kind : String) : Array(String)
+    private def extract_type_members(
+      content : String,
+      type_name : String,
+      type_kind : String,
+    ) : Array(String)
       lines = content.split('\n')
       members = [] of String
       in_type = false
@@ -270,6 +274,32 @@ module Liger
       end
 
       results.uniq { |s| s.name }
+    end
+
+    def get_lib_functions(lib_name : String) : Array(SymbolInfo)
+      scan_workspace_if_needed
+
+      results = [] of SymbolInfo
+      search_pattern = "#{lib_name}::"
+
+      @symbol_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.kind == "fun" && symbol.name.starts_with?(search_pattern)
+            results << symbol
+          end
+        end
+      end
+
+      scan_stdlib_if_needed
+      @stdlib_cache.each_value do |symbols|
+        symbols.each do |symbol|
+          if symbol.kind == "fun" && symbol.name.starts_with?(search_pattern)
+            results << symbol
+          end
+        end
+      end
+
+      results
     end
 
     def find_method_info(receiver_type : String, method_name : String) : SymbolInfo?
@@ -492,7 +522,7 @@ module Liger
           lib_name = match[1]
           full_name = (current_namespace + [lib_name]).join("::")
           doc = extract_documentation(lines, line_num)
-          
+
           symbols << SymbolInfo.new(full_name, "Lib", "lib", file_path, line_num, line.strip, doc)
           current_namespace.push(lib_name)
         elsif match = line.match(/^\s*fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
@@ -501,16 +531,16 @@ module Liger
           c_name = match[2]? || fun_name
           params = match[3]? || "()"
           return_type = match[4]? || "Void"
-          
+
           # Store with lib namespace prefix
           full_name = current_namespace.empty? ? fun_name : (current_namespace.join("::") + "::" + fun_name)
-          
+
           # Build signature for display
           signature = "fun #{fun_name}"
           signature += " = #{c_name}" if c_name != fun_name
           signature += params
           signature += " : #{return_type.strip}" unless return_type.strip.empty?
-          
+
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc)
         elsif match = line.match(/^\s*annotation\s+(\w+)/)
@@ -639,14 +669,14 @@ module Liger
           c_name = match[2]? || fun_name
           params = match[3]? || "()"
           return_type = match[4]? || "Void"
-          
+
           full_name = current_namespace.empty? ? fun_name : (current_namespace.join("::") + "::" + fun_name)
-          
+
           signature = "fun #{fun_name}"
           signature += " = #{c_name}" if c_name != fun_name
           signature += params
           signature += " : #{return_type.strip}" unless return_type.strip.empty?
-          
+
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
           symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.any?
@@ -783,14 +813,14 @@ module Liger
           c_name = match[2]? || fun_name
           params = match[3]? || "()"
           return_type = match[4]? || "Void"
-          
+
           full_name = current_namespace.empty? ? fun_name : (current_namespace.join("::") + "::" + fun_name)
-          
+
           signature = "fun #{fun_name}"
           signature += " = #{c_name}" if c_name != fun_name
           signature += params
           signature += " : #{return_type.strip}" unless return_type.strip.empty?
-          
+
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
           symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.any?
@@ -1207,7 +1237,11 @@ module Liger
       nil
     end
 
-    private def find_property_in_source(source : String, property_name : String, uri : String) : SymbolInfo?
+    private def find_property_in_source(
+      source : String,
+      property_name : String,
+      uri : String,
+    ) : SymbolInfo?
       lines = source.split('\n')
       clean_name = property_name.sub("@", "")
 

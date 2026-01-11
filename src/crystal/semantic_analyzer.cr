@@ -162,7 +162,7 @@ module Liger
               end
             end
           end
-          
+
           receiver_type = @workspace_analyzer.get_type_at_position(
             uri,
             source,
@@ -351,7 +351,7 @@ module Liger
       if match = prefix.match(/(\w+)\.(\w+)\s*\([^)]*$/)
         lib_name = match[1]
         fun_name = match[2]
-        
+
         if lib_symbol = @workspace_analyzer.find_symbol_info(lib_name)
           if lib_symbol.kind == "lib"
             fun_qualified_name = "#{lib_name}::#{fun_name}"
@@ -362,11 +362,11 @@ module Liger
                     sig,
                     fun_symbol.documentation
                   )
-                  
+
                   paren_start = match.begin(0).not_nil! + match[0].index('(').not_nil!
                   text_after_paren = prefix[paren_start..-1]
                   param_index = text_after_paren.count(',')
-                  
+
                   return LSP::SignatureHelp.new(
                     [signature_info],
                     0,
@@ -443,6 +443,24 @@ module Liger
           position.line,
           position.character - partial_method.size - 1
         )
+
+        if lib_symbol = @workspace_analyzer.find_symbol_info(receiver)
+          if lib_symbol.kind == "lib"
+            lib_functions = @workspace_analyzer.get_lib_functions(receiver)
+            lib_functions.each do |fun_symbol|
+              fun_name = fun_symbol.name.split("::").last
+              if fun_name.starts_with?(partial_method)
+                detail = fun_symbol.signature || "extern function"
+                items << LSP::CompletionItem.new(
+                  fun_name,
+                  LSP::CompletionItemKind::Function,
+                  detail
+                )
+              end
+            end
+            return items
+          end
+        end
 
         receiver_type = nil
         if @enable_type_aware_completion
@@ -1349,7 +1367,7 @@ module Liger
               end
             end
           end
-          
+
           receiver_type = @workspace_analyzer.get_type_at_position(
             uri,
             source,
