@@ -292,18 +292,29 @@ module Liger
       line = lines[position.line]
       prefix = line[0...position.character]
 
-      STDERR.puts "Completion request: line='#{line}', prefix='#{prefix}', pos=#{position.character}"
+      File.open("/tmp/liger_debug.log", "a") do |f|
+        f.puts "=== COMPLETION DEBUG ==="
+        f.puts "Completion request: line='#{line}', prefix='#{prefix}', pos=#{position.character}"
+        f.puts "Line length: #{line.size}, Position: #{position.character}"
+      end
 
       if match = prefix.match(/([\w@]+)\.([\w]*)$/)
         receiver = match[1]
         partial_method = match[2]
 
-        STDERR.puts "Dot completion: receiver='#{receiver}', partial='#{partial_method}'"
+        File.open("/tmp/liger_debug.log", "a") do |f|
+          f.puts "Dot completion detected: receiver='#{receiver}', partial='#{partial_method}'"
+        end
 
         receiver_pos = LSP::Position.new(position.line, position.character - partial_method.size - 1)
         if receiver_type = @workspace_analyzer.get_type_at_position(uri, source, receiver_pos)
-          STDERR.puts "Found receiver type: #{receiver_type}"
+          File.open("/tmp/liger_debug.log", "a") do |f|
+            f.puts "Found receiver type via workspace analyzer: #{receiver_type}"
+          end
           completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
+          File.open("/tmp/liger_debug.log", "a") do |f|
+            f.puts "Available completions: #{completions.inspect}"
+          end
           completions.each do |method_name|
             if method_name.starts_with?(partial_method)
               items << LSP::CompletionItem.new(
@@ -314,10 +325,17 @@ module Liger
             end
           end
         else
-          STDERR.puts "No receiver type found, trying variable inference"
+          File.open("/tmp/liger_debug.log", "a") do |f|
+            f.puts "No receiver type found via workspace analyzer, trying variable inference"
+          end
           if receiver_type = find_variable_type_in_source(source, receiver, position.line)
-            STDERR.puts "Inferred receiver type: #{receiver_type}"
+            File.open("/tmp/liger_debug.log", "a") do |f|
+              f.puts "Inferred receiver type: #{receiver_type}"
+            end
             completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
+            File.open("/tmp/liger_debug.log", "a") do |f|
+              f.puts "Available completions: #{completions.inspect}"
+            end
             completions.each do |method_name|
               if method_name.starts_with?(partial_method)
                 items << LSP::CompletionItem.new(
@@ -326,6 +344,10 @@ module Liger
                   "#{receiver_type} method"
                 )
               end
+            end
+          else
+            File.open("/tmp/liger_debug.log", "a") do |f|
+              f.puts "Could not infer receiver type for '#{receiver}'"
             end
           end
         end
@@ -689,6 +711,10 @@ module Liger
       end
 
       if match = value.match(/(\w+)\.new/)
+        return match[1]
+      end
+
+      if match = value.match(/(\w+)\.from_json/)
         return match[1]
       end
 

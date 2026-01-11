@@ -122,6 +122,10 @@ module Liger
       word = extract_word_at_position(line, position.character)
       return nil unless word
 
+      if word.match(/^[A-Z]\w*$/)
+        return word
+      end
+
       if word.starts_with?("@")
         if type = find_instance_variable_type(source, word)
           return type
@@ -618,6 +622,10 @@ module Liger
           assignment = match[1].strip
           return infer_type_from_value(assignment)
         end
+
+        if match = line.match(/def\s+\w+\([^)]*#{Regex.escape(var_name)}\s*:\s*(\w+)/)
+          return match[1]
+        end
       end
 
       nil
@@ -714,9 +722,16 @@ module Liger
         return "Hash(#{match[1]}, #{match[2]})"
       end
 
-      # Class instantiation
       if match = value.match(/^(\w+)\.new/)
         return match[1]
+      end
+
+      if match = value.match(/^(\w+)\.from_json/)
+        return match[1]
+      end
+
+      if value.match(/^[A-Z]\w*$/)
+        return value
       end
 
       "Object"
@@ -746,7 +761,29 @@ module Liger
     def get_completions_for_receiver(receiver_type : String) : Array(String)
       completions = [] of String
 
+      # Check for LSP protocol types first
       case receiver_type
+      when "TextDocumentPositionParams"
+        completions = ["text_document", "position"]
+      when "TextDocumentIdentifier"
+        completions = ["uri"]
+      when "Position"
+        completions = ["line", "character"]
+      when "Location"
+        completions = ["uri", "range"]
+      when "CompletionParams"
+        completions = ["text_document", "position", "context"]
+      when "CompletionItem"
+        completions = ["label", "kind", "detail", "documentation", "sort_text", "filter_text", "insert_text"]
+      when "Hover"
+        completions = ["contents", "range"]
+      when "MarkupContent"
+        completions = ["kind", "value"]
+      when "Diagnostic"
+        completions = ["range", "severity", "code", "source", "message"]
+        # Class types (for class methods)
+      when "TextDocumentManager", "SemanticAnalyzer", "WorkspaceAnalyzer", "CrystalParser"
+        completions = ["new"]
       when "String"
         completions = ["size", "empty?", "upcase", "downcase", "strip", "split", "starts_with?", "ends_with?", "includes?", "chars", "gsub", "match", "to_i", "to_f", "reverse", "capitalize", "chomp", "lstrip", "rstrip"]
       when "Array"

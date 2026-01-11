@@ -164,15 +164,19 @@ module LSP
       doc = @document_manager.get(completion_params.text_document.uri)
       return JSON.parse("null") unless doc
 
-      items = @semantic_analyzer.completions(doc.uri, completion_params.position)
+      items = [] of LSP::CompletionItem
 
       parser = Liger::CrystalParser.new(doc.uri, doc.text)
       items += parser.completions(completion_params.position)
 
+      semantic_items = @semantic_analyzer.completions(doc.uri, completion_params.position)
+      items += semantic_items
+
       items = items.uniq { |item| item.label }
 
-      result = CompletionList.new(items, false)
-      JSON.parse(result.to_json)
+      json_response = items.to_json
+
+      JSON.parse(json_response)
     end
 
     # Hover request

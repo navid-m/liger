@@ -177,6 +177,10 @@ module LSP
     Event         = 23
     Operator      = 24
     TypeParameter = 25
+
+    def to_json(json : JSON::Builder)
+      json.number(self.value)
+    end
   end
 
   # Completion item

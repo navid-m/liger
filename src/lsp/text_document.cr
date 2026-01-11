@@ -119,7 +119,7 @@ module LSP
     def offset_at(position : Position) : Int32
       offset = 0
       position.line.times do |i|
-        offset += (@lines[i]?.try(&.size) || 0) + 1 
+        offset += (@lines[i]?.try(&.size) || 0) + 1
       end
       offset + position.character
     end
@@ -128,7 +128,7 @@ module LSP
     def position_at(offset : Int32) : Position
       current_offset = 0
       @lines.each_with_index do |line, i|
-        line_length = line.size + 1 
+        line_length = line.size + 1
         if current_offset + line_length > offset
           return Position.new(i, offset - current_offset)
         end
