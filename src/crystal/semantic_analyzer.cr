@@ -766,7 +766,9 @@ module Liger
     # Resolve require path to actual file location
     private def resolve_require_path(require_path : String, uri : String) : LSP::Location?
       current_file = uri_to_filename(uri)
-      workspace_path = @workspace_root ? uri_to_filename(@workspace_root.not_nil!) : File.dirname(current_file)
+      workspace_path = @workspace_root ? uri_to_filename(
+        @workspace_root.not_nil!
+      ) : File.dirname(current_file)
 
       if require_path.starts_with?("./") || require_path.starts_with?("../")
         base_dir = File.dirname(current_file)
