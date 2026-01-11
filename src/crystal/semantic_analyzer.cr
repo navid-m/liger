@@ -398,7 +398,11 @@ module Liger
       nil
     end
 
-    def rename(uri : String, position : LSP::Position, new_name : String) : LSP::WorkspaceEdit?
+    def rename(
+      uri : String,
+      position : LSP::Position,
+      new_name : String,
+    ) : LSP::WorkspaceEdit?
       source = @sources[uri]?
       return nil unless source
 
