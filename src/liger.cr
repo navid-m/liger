@@ -11,7 +11,7 @@ module Liger
 end
 
 def print_version
-  puts "Liger #{Liger::VERSION}"
+  puts "Liger v#{Liger::VERSION}"
 end
 
 def print_help
