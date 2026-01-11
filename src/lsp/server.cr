@@ -107,7 +107,7 @@ module LSP
     # Handle an exit notification
     private def handle_exit(params : JSON::Any?)
       STDERR.puts "Exiting"
-      exit(@shutdown_requested ? 0 : 1)
+      exit(0)
     end
 
     # Handle a didOpen notification

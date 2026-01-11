@@ -112,12 +112,14 @@ module LSP
           message = read_message
           process_message(message) if message
         rescue ex : IO::EOFError
+          STDERR.puts "Input stream closed, exiting server"
           break
         rescue ex : Exception
           STDERR.puts "Error processing message: #{ex.message}"
           STDERR.puts ex.backtrace.join("\n")
         end
       end
+      exit 0
     end
 
     private def read_message : JSON::Any?
