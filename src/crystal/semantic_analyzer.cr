@@ -311,7 +311,10 @@ module Liger
           f.puts "Dot completion detected: receiver='#{receiver}', partial='#{partial_method}'"
         end
 
-        receiver_pos = LSP::Position.new(position.line, position.character - partial_method.size - 1)
+        receiver_pos = LSP::Position.new(
+          position.line,
+          position.character - partial_method.size - 1
+        )
         if receiver_type = @workspace_analyzer.get_type_at_position(uri, source, receiver_pos)
           File.open("/tmp/liger_debug.log", "a") do |f|
             f.puts "Found receiver type via workspace analyzer: #{receiver_type}"
