@@ -1139,7 +1139,11 @@ module Liger
       @symbol_cache[file_path] = symbols
     end
 
-    private def find_variable_type(source : String, var_name : String, current_line : Int32) : String?
+    private def find_variable_type(
+      source : String,
+      var_name : String,
+      current_line : Int32,
+    ) : String?
       lines = source.split('\n')
 
       (0...current_line).reverse_each do |line_num|
@@ -1450,7 +1454,10 @@ module Liger
       nil
     end
 
-    private def is_method_available_for_type(symbol : SymbolInfo, receiver_type : String) : Bool
+    private def is_method_available_for_type(
+      symbol : SymbolInfo,
+      receiver_type : String,
+    ) : Bool
       case receiver_type
       when "String"
         return true if ["Object", "Reference", "Value"].includes?(symbol.type)
@@ -1519,7 +1526,11 @@ module Liger
       line[start_pos..end_pos]
     end
 
-    private def get_receiver_type(source : String, receiver : String, current_line : Int32) : String?
+    private def get_receiver_type(
+      source : String,
+      receiver : String,
+      current_line : Int32,
+    ) : String?
       if receiver.starts_with?("@")
         return find_instance_variable_type(source, receiver)
       end
