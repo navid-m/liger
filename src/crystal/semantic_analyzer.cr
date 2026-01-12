@@ -1391,7 +1391,6 @@ module Liger
       begin
         output_io = IO::Memory.new
         error_io = IO::Memory.new
-
         temp_file = get_temp_file_for_uri(uri, source)
         cursor_loc = "#{temp_file}:#{line}:#{column}"
 
