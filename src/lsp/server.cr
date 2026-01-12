@@ -26,7 +26,7 @@ module LSP
 
     # Run the server
     def run
-      STDERR.puts "Liger LSP server starting..."
+      STDERR.puts "(Liger) LSP server starting."
       @rpc.listen
     end
 
