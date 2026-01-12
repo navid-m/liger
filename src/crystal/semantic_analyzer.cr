@@ -147,10 +147,8 @@ module Liger
       if dot_pos = find_dot_in_line(line_text, position.character)
         receiver_word = extract_word_before_dot(line_text, dot_pos)
         if receiver_word
-          # Check if this is a lib function call (e.g., GL.clear)
           if lib_symbol = @workspace_analyzer.find_symbol_info(receiver_word)
             if lib_symbol.kind == "lib"
-              # Look for the function within this lib
               fun_qualified_name = "#{receiver_word}::#{word}"
               if fun_symbol = @workspace_analyzer.find_symbol_info(fun_qualified_name)
                 if fun_symbol.kind == "fun"
@@ -511,6 +509,34 @@ module Liger
         end
 
         if receiver_type
+          STDERR.puts "DEBUG Completion: Found receiver_type '#{receiver_type}' for '#{receiver}'"
+
+          class_members = @workspace_analyzer.get_class_methods_and_properties(receiver_type)
+          STDERR.puts "DEBUG Completion: Found #{class_members.size} members for type '#{receiver_type}'"
+
+          class_members.each do |member_symbol|
+            member_name = member_symbol.name.split("::").last
+            member_name = member_name.sub(/^@/, "") if member_name.starts_with?("@")
+
+            if member_name.starts_with?(partial_method)
+              kind = case member_symbol.kind
+                     when "method"
+                       LSP::CompletionItemKind::Method
+                     when "property", "getter", "setter"
+                       LSP::CompletionItemKind::Property
+                     else
+                       LSP::CompletionItemKind::Field
+                     end
+
+              detail = member_symbol.signature || member_symbol.type
+              items << LSP::CompletionItem.new(
+                member_name,
+                kind,
+                detail
+              )
+            end
+          end
+
           completions = @workspace_analyzer.get_completions_for_receiver(receiver_type)
           completions.each do |method_name|
             if method_name.starts_with?(partial_method)
@@ -1258,6 +1284,25 @@ module Liger
     ) : String?
       lines = @source_lines_cache.values.first? || source.split('\n')
 
+      if var_name.starts_with?("@")
+        lines.each do |line|
+          if match = line.match(/^\s*#{Regex.escape(var_name)}\s*:\s*(\w+(?:::\w+)?)/)
+            return match[1]
+          end
+          clean_name = var_name.sub(/^@/, "")
+          if match = line.match(/^\s*(?:property|getter|setter)\s+#{Regex.escape(clean_name)}\s*:\s*(\w+(?:::\w+)?)/)
+            return match[1]
+          end
+        end
+
+        lines.each_with_index do |line, idx|
+          if match = line.match(/#{Regex.escape(var_name)}\s*=\s*(.+)/)
+            assignment = match[1].strip
+            return infer_type_from_assignment(assignment)
+          end
+        end
+      end
+
       if var_name[0].uppercase?
         lines.each do |line|
           if match = line.match(/^\s*#{Regex.escape(var_name)}\s*:\s*(\w+(?:::\w+)?)\s*=/)
@@ -1319,7 +1364,7 @@ module Liger
         end
       end
 
-      if match = value.match(/(\w+(?:::\w+)*)\.new/)
+      if match = value.match(/(\w+(?:::\w+)*)\.new(?:\(|$)/)
         return match[1]
       end
 
@@ -1327,10 +1372,8 @@ module Liger
         return match[1]
       end
 
-      if value.match(/^(\w+(?:::\w+)*)\(/)
-        if match = value.match(/^(\w+(?:::\w+)*)\(/)
-          return match[1]
-        end
+      if match = value.match(/^(\w+(?:::\w+)*)\(/)
+        return match[1]
       end
 
       "Object"
