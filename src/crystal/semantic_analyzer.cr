@@ -1957,7 +1957,10 @@ module Liger
       end
     end
 
-    private def add_file_symbol_completions(items : Array(LSP::CompletionItem), source : String)
+    private def add_file_symbol_completions(
+      items : Array(LSP::CompletionItem),
+      source : String,
+    )
       begin
         parser = Crystal::Parser.new(source)
         node = parser.parse
