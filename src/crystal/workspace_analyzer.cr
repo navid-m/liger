@@ -206,9 +206,28 @@ module Liger
       end
 
       if is_qualified
+        parts = symbol_name.split("::")
+        if parts.size >= 2
+          (parts.size - 1).downto(1) do |i|
+            parent_namespace = parts[0...i].join("::")
+            member_name = parts[i..-1].join("::")
+
+            @symbol_cache.each_value do |symbols|
+              symbols.each do |symbol|
+                if symbol.name == parent_namespace &&
+                   ["enum", "class", "module", "struct"].includes?(symbol.kind)
+                  if found = find_member_in_file(symbol.file, member_name, symbol.line)
+                    return found
+                  end
+                end
+              end
+            end
+          end
+        end
+
         @symbol_cache.each_value do |symbols|
           symbols.each do |symbol|
-            if symbol.name == symbol_name || symbol.name.ends_with?("::#{symbol_name}")
+            if symbol.name == symbol_name
               return symbol
             end
           end
@@ -230,9 +249,28 @@ module Liger
       end
 
       if is_qualified
+        parts = symbol_name.split("::")
+        if parts.size >= 2
+          (parts.size - 1).downto(1) do |i|
+            parent_namespace = parts[0...i].join("::")
+            member_name = parts[i..-1].join("::")
+
+            @stdlib_cache.each_value do |symbols|
+              symbols.each do |symbol|
+                if symbol.name == parent_namespace &&
+                   ["enum", "class", "module", "struct"].includes?(symbol.kind)
+                  if found = find_member_in_file(symbol.file, member_name, symbol.line)
+                    return found
+                  end
+                end
+              end
+            end
+          end
+        end
+
         @stdlib_cache.each_value do |symbols|
           symbols.each do |symbol|
-            if symbol.name == symbol_name || symbol.name.ends_with?("::#{symbol_name}")
+            if symbol.name == symbol_name
               return symbol
             end
           end
@@ -276,9 +314,28 @@ module Liger
       end
 
       if is_qualified
+        parts = symbol_name.split("::")
+        if parts.size >= 2
+          (parts.size - 1).downto(1) do |i|
+            parent_namespace = parts[0...i].join("::")
+            member_name = parts[i..-1].join("::")
+
+            @lib_cache.each_value do |symbols|
+              symbols.each do |symbol|
+                if symbol.name == parent_namespace &&
+                   ["enum", "class", "module", "struct"].includes?(symbol.kind)
+                  if found = find_member_in_file(symbol.file, member_name, symbol.line)
+                    return found
+                  end
+                end
+              end
+            end
+          end
+        end
+
         @lib_cache.each_value do |symbols|
           symbols.each do |symbol|
-            if symbol.name == symbol_name || symbol.name.ends_with?("::#{symbol_name}")
+            if symbol.name == symbol_name
               return symbol
             end
           end
@@ -1517,6 +1574,109 @@ module Liger
       end
 
       filename.gsub('/', File::SEPARATOR)
+    end
+
+    # Find a member (enum value, constant, nested class, etc.) within a file
+    private def find_member_in_file(file_path : String, member_name : String, parent_line : Int32) : SymbolInfo?
+      content = @file_cache[file_path]?
+      return nil unless content
+
+      lines = content.split('\n')
+      return nil if parent_line >= lines.size
+
+      parent_indent = lines[parent_line].size - lines[parent_line].lstrip.size
+
+      (parent_line + 1...lines.size).each do |line_num|
+        line = lines[line_num]
+        line_indent = line.size - line.lstrip.size
+
+        if !line.strip.empty? && line_indent <= parent_indent && line.match(/^\s*(end|class|module|struct|enum)/)
+          break
+        end
+
+        stripped = line.strip
+        next if stripped.empty? || stripped.starts_with?("#")
+
+        if match = stripped.match(/^([A-Z]\w*)\s*(?:=|$)/)
+          if match[1] == member_name
+            range = LSP::Range.new(
+              LSP::Position.new(line_num, line_indent),
+              LSP::Position.new(line_num, line_indent + member_name.size)
+            )
+            return SymbolInfo.new(
+              member_name,
+              "EnumMember",
+              "enum_member",
+              file_path,
+              line_num,
+              stripped,
+              nil
+            )
+          end
+        end
+
+        # Match nested classes
+        if match = stripped.match(/^class\s+(\w+)/)
+          if match[1] == member_name
+            return SymbolInfo.new(
+              member_name,
+              "Class",
+              "class",
+              file_path,
+              line_num,
+              stripped,
+              nil
+            )
+          end
+        end
+
+        # Match nested modules
+        if match = stripped.match(/^module\s+(\w+)/)
+          if match[1] == member_name
+            return SymbolInfo.new(
+              member_name,
+              "Module",
+              "module",
+              file_path,
+              line_num,
+              stripped,
+              nil
+            )
+          end
+        end
+
+        # Match nested structs
+        if match = stripped.match(/^struct\s+(\w+)/)
+          if match[1] == member_name
+            return SymbolInfo.new(
+              member_name,
+              "Struct",
+              "struct",
+              file_path,
+              line_num,
+              stripped,
+              nil
+            )
+          end
+        end
+
+        # Match constants
+        if match = stripped.match(/^([A-Z][A-Z_]*)\s*=/)
+          if match[1] == member_name
+            return SymbolInfo.new(
+              member_name,
+              "Constant",
+              "constant",
+              file_path,
+              line_num,
+              stripped,
+              nil
+            )
+          end
+        end
+      end
+
+      nil
     end
   end
 end
