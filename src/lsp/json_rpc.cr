@@ -22,12 +22,12 @@ module LSP
   end
 
   struct ResponseMessage < Message
-    property id : String | Int32 | Nil
+    property id : String | Int32?
     property result : JSON::Any?
     property error : ResponseError?
 
     def initialize(
-      @id : String | Int32 | Nil,
+      @id : String | Int32?,
       @result : JSON::Any? = nil,
       @error : ResponseError? = nil,
     )
@@ -89,7 +89,7 @@ module LSP
     end
 
     def send_response(
-      id : String | Int32 | Nil,
+      id : String | Int32?,
       result : JSON::Any? = nil,
       error : ResponseError? = nil,
     )
