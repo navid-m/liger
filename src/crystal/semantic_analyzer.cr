@@ -132,6 +132,14 @@ module Liger
         STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}"
       {% end %}
 
+      local_result = find_local_variable_or_parameter(source, word, position, uri)
+      if local_result[0]
+        {% if flag?(:debug) %}
+          STDERR.puts "Found local variable or parameter: #{word}"
+        {% end %}
+        return local_result[0]
+      end
+
       if symbol = @workspace_analyzer.find_symbol_info(word)
         {% if flag?(:debug) %}
           STDERR.puts "Found symbol in workspace: #{symbol.name} (#{symbol.kind}) in #{symbol.file}:#{symbol.line}"
@@ -1450,6 +1458,12 @@ module Liger
       word = extract_qualified_name_at_position(line_text, position.character)
       return nil unless word
 
+      local_result = find_local_variable_or_parameter(source, word, position, uri)
+      if local_result[1]
+        content = "```crystal\n#{word} : #{local_result[1]}\n```\n\n*Local variable or parameter*"
+        return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
+      end
+
       if dot_pos = find_dot_in_line(line_text, position.character)
         receiver_word = extract_word_before_dot(line_text, dot_pos)
         if receiver_word
@@ -1746,6 +1760,96 @@ module Liger
       end
 
       nil
+    end
+
+    private def find_local_variable_or_parameter(
+      source : String,
+      symbol_name : String,
+      position : LSP::Position,
+      uri : String,
+    ) : {LSP::Location?, String?}
+      lines = get_lines(uri)
+      unless lines
+        lines = source.split('\n')
+      end
+
+      method_start = nil
+      method_end = nil
+      indent_level = 0
+
+      (0..position.line).reverse_each do |line_num|
+        line = lines[line_num]
+        if match = line.match(/^\s*(?:private\s+)?def\s+[\w=]+/)
+          method_start = line_num
+          indent_level = line[/^\s*/].size
+
+          (line_num + 1...lines.size).each do |end_line_num|
+            end_line = lines[end_line_num]
+            end_indent = end_line[/^\s*/].size
+
+            if end_line.strip == "end" && end_indent == indent_level
+              method_end = end_line_num
+              break
+            end
+          end
+          break
+        end
+      end
+
+      if method_start && method_end
+        method_line = lines[method_start]
+        if match = method_line.match(/def\s+[\w=]+\s*\((.*?)(?:\)|$)/)
+          params_str = match[1]
+
+          if !method_line.includes?(")") && method_start < lines.size - 1
+            (method_start + 1...lines.size).each do |i|
+              next_line = lines[i]
+              params_str += next_line
+              break if next_line.includes?(")")
+              break if i > method_start + 10
+            end
+          end
+
+          params_str.split(',').each do |param|
+            param = param.strip
+            if param_match = param.match(/^(\w+)\s*:\s*([^=]+)/)
+              param_name = param_match[1]
+              param_type = param_match[2].strip
+
+              if param_name == symbol_name
+                range = LSP::Range.new(
+                  LSP::Position.new(method_start, method_line.index(param_name).not_nil!),
+                  LSP::Position.new(method_start, method_line.index(param_name).not_nil! + param_name.size)
+                )
+                return {LSP::Location.new(uri, range), param_type}
+              end
+            end
+          end
+        end
+
+        (method_start..position.line).each do |line_num|
+          line = lines[line_num]
+
+          if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*=/)
+            range = LSP::Range.new(
+              LSP::Position.new(line_num, match.begin(1).not_nil!),
+              LSP::Position.new(line_num, match.end(1).not_nil!)
+            )
+            return {LSP::Location.new(uri, range), nil}
+          end
+
+          if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*:\s*([^=]+)=/)
+            param_type = match[2].strip
+            range = LSP::Range.new(
+              LSP::Position.new(line_num, match.begin(1).not_nil!),
+              LSP::Position.new(line_num, match.end(1).not_nil!)
+            )
+            return {LSP::Location.new(uri, range), param_type}
+          end
+        end
+      end
+
+      {nil, nil}
     end
 
     private def find_definition_in_current_file(
