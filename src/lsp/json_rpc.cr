@@ -12,7 +12,11 @@ module LSP
     property method : String
     property params : JSON::Any?
 
-    def initialize(@id : String | Int32, @method : String, @params : JSON::Any? = nil)
+    def initialize(
+      @id : String | Int32,
+      @method : String,
+      @params : JSON::Any? = nil,
+    )
       @jsonrpc = "2.0"
     end
   end
@@ -38,7 +42,11 @@ module LSP
     property message : String
     property data : JSON::Any?
 
-    def initialize(@code : Int32, @message : String, @data : JSON::Any? = nil)
+    def initialize(
+      @code : Int32,
+      @message : String,
+      @data : JSON::Any? = nil,
+    )
     end
   end
 
@@ -94,7 +102,11 @@ module LSP
       send_message(notification)
     end
 
-    def send_request(id : String | Int32, method : String, params : JSON::Any? = nil)
+    def send_request(
+      id : String | Int32,
+      method : String,
+      params : JSON::Any? = nil,
+    )
       request = RequestMessage.new(id, method, params)
       send_message(request)
     end
@@ -157,7 +169,11 @@ module LSP
       end
     end
 
-    private def handle_request(id : JSON::Any, method : String, params : JSON::Any?)
+    private def handle_request(
+      id : JSON::Any,
+      method : String,
+      params : JSON::Any?,
+    )
       handler = @handlers[method]?
 
       if handler
