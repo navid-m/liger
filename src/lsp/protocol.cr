@@ -58,7 +58,7 @@ module LSP
     Hint        = 4
 
     def to_json(json : JSON::Builder)
-      json.number(self.value)
+      json.number(value)
     end
   end
 
@@ -190,7 +190,7 @@ module LSP
     TypeParameter = 25
 
     def to_json(json : JSON::Builder)
-      json.number(self.value)
+      json.number(value)
     end
   end
 
@@ -269,7 +269,7 @@ module LSP
     TypeParameter = 26
 
     def to_json(json : JSON::Builder)
-      json.number(self.value)
+      json.number(value)
     end
   end
 
