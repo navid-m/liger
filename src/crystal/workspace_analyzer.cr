@@ -1454,7 +1454,7 @@ module Liger
       nil
     end
 
-    private def is_method_available_for_type(
+    private def method_available_for_type?(
       symbol : SymbolInfo,
       receiver_type : String,
     ) : Bool
