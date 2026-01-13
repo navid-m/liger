@@ -68,7 +68,7 @@ module LSP
         if init_options = params["initializationOptions"]?
           if strict_checking = init_options["strictTypeChecking"]?
             @semantic_analyzer.enable_strict_type_checking = strict_checking.as_bool? || false
-            STDERR.puts "Strict type checking: #{@semantic_analyzer.enable_strict_type_checking}"
+            STDERR.puts "Strict type checking: #{@semantic_analyzer.enable_strict_type_checking?}"
           end
         end
       end

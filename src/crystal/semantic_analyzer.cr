@@ -7,9 +7,9 @@ require "yaml"
 module Liger
   class SemanticAnalyzer
     property workspace_root : String?
-    property enable_semantic_hover : Bool = true
-    property enable_type_aware_completion : Bool = true
-    property enable_strict_type_checking : Bool = false
+    property? enable_semantic_hover : Bool = true
+    property? enable_type_aware_completion : Bool = true
+    property? enable_strict_type_checking : Bool = false
 
     @sources = Hash(String, String).new
     @source_lines_cache = Hash(String, Array(String)).new
@@ -106,7 +106,7 @@ module Liger
         )
       end
 
-      if ast && @enable_strict_type_checking
+      if ast && enable_strict_type_checking?
         type_check_diagnostics = check_argument_types(ast, uri, source)
         diagnostics.concat(type_check_diagnostics)
       end
@@ -507,7 +507,7 @@ module Liger
         end
 
         receiver_type = nil
-        if @enable_type_aware_completion
+        if enable_type_aware_completion?
           receiver_type = get_type_via_crystal_tool(uri, source, receiver_pos)
         end
 
@@ -566,7 +566,7 @@ module Liger
 
         add_common_method_completions(items)
 
-        if items.size < 5 && @enable_type_aware_completion
+        if items.size < 5 && enable_type_aware_completion?
           filename = uri_to_filename(uri)
           line_num = position.line + 1
           col_num = position.character - 1
