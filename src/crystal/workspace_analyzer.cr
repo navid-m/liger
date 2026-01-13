@@ -374,7 +374,7 @@ module Liger
         end
       end
 
-      results.uniq { |s| s.name }
+      results.uniq(&.name)
     end
 
     def get_lib_functions(lib_name : String) : Array(SymbolInfo)

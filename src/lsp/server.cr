@@ -184,7 +184,7 @@ module LSP
       semantic_items = @semantic_analyzer.completions(doc.uri, completion_params.position)
       items += semantic_items
 
-      items = items.uniq { |item| item.label }
+      items = items.uniq(&.label)
 
       json_response = items.to_json
 
