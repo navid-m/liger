@@ -477,7 +477,7 @@ module Liger
             class_members = @workspace_analyzer.get_class_methods_and_properties(receiver)
             STDERR.puts "DEBUG Completion: Found #{class_members.size} members"
 
-            class_members.each_with_index do |member_symbol, idx|
+            class_members.each do |member_symbol|
               member_name = member_symbol.name.split("::").last
               member_name = member_name.sub(/^@/, "") if member_name.starts_with?("@")
 
@@ -1310,7 +1310,7 @@ module Liger
           end
         end
 
-        lines.each_with_index do |line, idx|
+        lines.each do |line|
           if match = line.match(/#{Regex.escape(var_name)}\s*=\s*(.+)/)
             assignment = match[1].strip
             return infer_type_from_assignment(assignment)
