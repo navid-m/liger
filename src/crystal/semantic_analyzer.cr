@@ -373,7 +373,7 @@ module Liger
                     fun_symbol.documentation
                   )
 
-                  paren_start = match.begin(0).not_nil! + match[0].index('(').not_nil!
+                  paren_start = match.begin(0).not_nil! + match[0].index!('(')
                   text_after_paren = prefix[paren_start..-1]
                   param_index = text_after_paren.count(',')
 
@@ -1825,8 +1825,8 @@ module Liger
 
               if param_name == symbol_name
                 range = LSP::Range.new(
-                  LSP::Position.new(method_start, method_line.index(param_name).not_nil!),
-                  LSP::Position.new(method_start, method_line.index(param_name).not_nil! + param_name.size)
+                  LSP::Position.new(method_start, method_line.index!(param_name)),
+                  LSP::Position.new(method_start, method_line.index!(param_name) + param_name.size)
                 )
                 return {LSP::Location.new(uri, range), param_type}
               end
