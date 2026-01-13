@@ -7,7 +7,7 @@ require "./crystal/parser"
 require "./crystal/semantic_analyzer"
 
 module Liger
-  VERSION = "0.1.1"
+  VERSION = "0.1.2"
 end
 
 def print_version
