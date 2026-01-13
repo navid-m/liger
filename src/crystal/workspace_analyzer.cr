@@ -526,10 +526,11 @@ module Liger
     end
 
     private def scan_workspace_if_needed
-      return unless @workspace_root
-      return if @last_scan_time && (Time.utc - @last_scan_time.not_nil!).total_seconds < 5
+      return unless workspace_root = @workspace_root
+      return if (last_scan_time = @last_scan_time) &&
+                (Time.utc - last_scan_time).total_seconds < 5
 
-      workspace_path = uri_to_filename(@workspace_root.not_nil!)
+      workspace_path = uri_to_filename(workspace_root)
       return unless Dir.exists?(workspace_path)
 
       STDERR.puts "Scanning workspace: #{workspace_path}"

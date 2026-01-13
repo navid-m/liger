@@ -22,10 +22,10 @@ module Liger
 
     def initialize(@workspace_root : String? = nil)
       @workspace_analyzer = WorkspaceAnalyzer.new(@workspace_root)
-      if @workspace_root
-        workspace_path = uri_to_filename(@workspace_root.not_nil!)
-        @cache_dir = File.join(workspace_path, ".liger-cache")
-        Dir.mkdir_p(@cache_dir.not_nil!) unless Dir.exists?(@cache_dir.not_nil!)
+      if workspace_root = @workspace_root
+        workspace_path = uri_to_filename(workspace_root)
+        @cache_dir = cache_dir = File.join(workspace_path, ".liger-cache")
+        Dir.mkdir_p(cache_dir) unless Dir.exists?(cache_dir)
       end
     end
 
@@ -34,8 +34,8 @@ module Liger
       @workspace_analyzer = WorkspaceAnalyzer.new(root)
       if root
         workspace_path = uri_to_filename(root)
-        @cache_dir = File.join(workspace_path, ".liger-cache")
-        Dir.mkdir_p(@cache_dir.not_nil!) unless Dir.exists?(@cache_dir.not_nil!)
+        @cache_dir = cache_dir = File.join(workspace_path, ".liger-cache")
+        Dir.mkdir_p(cache_dir) unless Dir.exists?(cache_dir)
       end
     end
 
@@ -373,7 +373,7 @@ module Liger
                     fun_symbol.documentation
                   )
 
-                  paren_start = match.begin(0).not_nil! + match[0].index!('(')
+                  paren_start = match.begin(0) + match[0].index!('(')
                   text_after_paren = prefix[paren_start..-1]
                   param_index = text_after_paren.count(',')
 
@@ -398,7 +398,7 @@ module Liger
             nil
           )
 
-          paren_start = match.begin(0).not_nil! + match[1].size
+          paren_start = match.begin(0) + match[1].size
           text_after_paren = prefix[paren_start..-1]
           param_index = text_after_paren.count(',')
 
@@ -416,7 +416,7 @@ module Liger
               symbol.documentation
             )
 
-            paren_start = match.begin(0).not_nil! + match[1].size
+            paren_start = match.begin(0) + match[1].size
             text_after_paren = prefix[paren_start..-1]
             param_index = text_after_paren.count(',')
 
@@ -772,15 +772,15 @@ module Liger
     end
 
     private def find_main_file(current_file : String) : String?
-      return unless @workspace_root
+      return unless workspace_root = @workspace_root
 
-      if @main_file_cache && @main_file_cache_time
-        if (Time.utc - @main_file_cache_time.not_nil!).total_seconds < 5
-          return @main_file_cache
+      if (main_file_cache = @main_file_cache) && (cache_time = @main_file_cache_time)
+        if (Time.utc - cache_time).total_seconds < 5
+          return main_file_cache
         end
       end
 
-      workspace_path = uri_to_filename(@workspace_root.not_nil!)
+      workspace_path = uri_to_filename(workspace_root)
       shard_yml = File.join(workspace_path, "shard.yml")
       result : String? = nil
 
@@ -938,9 +938,11 @@ module Liger
     # Resolve require path to actual file location
     private def resolve_require_path(require_path : String, uri : String) : LSP::Location?
       current_file = uri_to_filename(uri)
-      workspace_path = @workspace_root ? uri_to_filename(
-        @workspace_root.not_nil!
-      ) : File.dirname(current_file)
+      workspace_path = if workspace_root = @workspace_root
+                         uri_to_filename(workspace_root)
+                       else
+                         File.dirname(current_file)
+                       end
 
       if require_path.starts_with?("./") || require_path.starts_with?("../")
         base_dir = File.dirname(current_file)
@@ -1041,9 +1043,11 @@ module Liger
           content = "**Require Statement**\n\n"
           content += "Path: `#{require_path}`\n\n"
 
-          workspace_path = @workspace_root ? uri_to_filename(
-            @workspace_root.not_nil!
-          ) : File.dirname(uri_to_filename(uri))
+          workspace_path = if workspace_root = @workspace_root
+                             uri_to_filename(workspace_root)
+                           else
+                             File.dirname(uri_to_filename(uri))
+                           end
 
           if require_path.starts_with?("./") || require_path.starts_with?("../")
             content += "Type: Relative require\n\n"
@@ -1839,8 +1843,8 @@ module Liger
 
           if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*=/)
             range = LSP::Range.new(
-              LSP::Position.new(line_num, match.begin(1).not_nil!),
-              LSP::Position.new(line_num, match.end(1).not_nil!)
+              LSP::Position.new(line_num, match.begin(1)),
+              LSP::Position.new(line_num, match.end(1))
             )
             return {LSP::Location.new(uri, range), nil}
           end
@@ -1848,8 +1852,8 @@ module Liger
           if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*:\s*([^=]+)=/)
             param_type = match[2].strip
             range = LSP::Range.new(
-              LSP::Position.new(line_num, match.begin(1).not_nil!),
-              LSP::Position.new(line_num, match.end(1).not_nil!)
+              LSP::Position.new(line_num, match.begin(1)),
+              LSP::Position.new(line_num, match.end(1))
             )
             return {LSP::Location.new(uri, range), param_type}
           end
@@ -1872,8 +1876,8 @@ module Liger
       lines.each_with_index do |line, line_num|
         if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*[=:]/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1881,8 +1885,8 @@ module Liger
         # Method definitions
         if match = line.match(/^\s*def\s+(#{Regex.escape(symbol_name)})(?:\(|$|\s)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1890,8 +1894,8 @@ module Liger
         # Private method definitions
         if match = line.match(/^\s*private\s+def\s+(#{Regex.escape(symbol_name)})(?:\(|$|\s)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1899,8 +1903,8 @@ module Liger
         # Struct definitions
         if match = line.match(/^\s*struct\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1908,8 +1912,8 @@ module Liger
         # Class definitions
         if match = line.match(/^\s*class\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1917,8 +1921,8 @@ module Liger
         # Module definitions
         if match = line.match(/^\s*module\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1926,8 +1930,8 @@ module Liger
         # Instance variable definitions
         if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*[=:]/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1935,8 +1939,8 @@ module Liger
         # Enum definitions
         if match = line.match(/^\s*enum\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1944,8 +1948,8 @@ module Liger
         # Struct definitions
         if match = line.match(/^\s*struct\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1953,8 +1957,8 @@ module Liger
         # Alias definitions
         if match = line.match(/^\s*alias\s+(#{Regex.escape(symbol_name)})(?:\s|$)/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1962,8 +1966,8 @@ module Liger
         # Constants
         if match = line.match(/^\s*(#{Regex.escape(symbol_name)})\s*=/)
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1973,8 +1977,8 @@ module Liger
              /^\s*(?:property|getter|setter)\s+(#{Regex.escape(symbol_name.sub("@", ""))})(?:\s|$)/
            )
           range = LSP::Range.new(
-            LSP::Position.new(line_num, match.begin(1).not_nil!),
-            LSP::Position.new(line_num, match.end(1).not_nil!)
+            LSP::Position.new(line_num, match.begin(1)),
+            LSP::Position.new(line_num, match.end(1))
           )
           return LSP::Location.new(uri, range)
         end
@@ -1983,8 +1987,8 @@ module Liger
         if symbol_name.starts_with?("@")
           if match = line.match(/(#{Regex.escape(symbol_name)})\s*:/)
             range = LSP::Range.new(
-              LSP::Position.new(line_num, match.begin(1).not_nil!),
-              LSP::Position.new(line_num, match.end(1).not_nil!)
+              LSP::Position.new(line_num, match.begin(1)),
+              LSP::Position.new(line_num, match.end(1))
             )
             return LSP::Location.new(uri, range)
           end

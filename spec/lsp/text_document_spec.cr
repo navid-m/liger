@@ -122,13 +122,13 @@ describe LSP::TextDocumentManager do
     manager.open("file:///test.cr", "crystal", 1, "initial text")
     doc = manager.get("file:///test.cr")
     doc.should_not be_nil
-    doc.not_nil!.text.should eq("initial text")
+    doc.not_nil!.text.should eq("initial text") # ameba:disable Lint/NotNil
 
     changes = [LSP::TextDocumentContentChangeEvent.new("updated text")]
     manager.change("file:///test.cr", 2, changes)
     doc = manager.get("file:///test.cr")
-    doc.not_nil!.text.should eq("updated text")
-    doc.not_nil!.version.should eq(2)
+    doc.not_nil!.text.should eq("updated text") # ameba:disable Lint/NotNil
+    doc.not_nil!.version.should eq(2)           # ameba:disable Lint/NotNil
 
     manager.close("file:///test.cr")
     manager.get("file:///test.cr").should be_nil
