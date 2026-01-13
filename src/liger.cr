@@ -20,19 +20,26 @@ def print_help
   puts "OPTIONS:"
   puts "  --version    Show version information"
   puts "  --help       Show this help message"
+  puts "  --strict     Enable stricter type checking"
 end
 
 if PROGRAM_NAME.includes?("liger")
+  strict_mode = false
+
   if ARGV.includes?("--version") || ARGV.includes?("-v")
     print_version
     exit 0
   elsif ARGV.includes?("--help") || ARGV.includes?("-h")
     print_help
     exit 0
+  elsif ARGV.includes?("--strict")
+    strict_mode = true
+    STDERR.puts "Strict type checking enabled"
   end
 
   begin
     server = LSP::Server.new
+    server.enable_strict_mode if strict_mode
     server.run
   rescue exception
     STDERR.puts "Server crashed: #{exception.message}"

@@ -24,6 +24,11 @@ module LSP
       setup_handlers
     end
 
+    # Enable strict type checking mode
+    def enable_strict_mode
+      @semantic_analyzer.enable_strict_type_checking = true
+    end
+
     # Run the server
     def run
       STDERR.puts "(Liger) LSP server starting."
@@ -59,6 +64,13 @@ module LSP
         root_uri = params["rootUri"]?.try(&.as_s?)
         @workspace_root = root_uri
         @semantic_analyzer.workspace_root = root_uri
+
+        if init_options = params["initializationOptions"]?
+          if strict_checking = init_options["strictTypeChecking"]?
+            @semantic_analyzer.enable_strict_type_checking = strict_checking.as_bool? || false
+            STDERR.puts "Strict type checking: #{@semantic_analyzer.enable_strict_type_checking}"
+          end
+        end
       end
 
       capabilities = {
