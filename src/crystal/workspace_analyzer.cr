@@ -62,7 +62,7 @@ module Liger
         break if class_symbol
       end
 
-      return nil unless class_symbol
+      return unless class_symbol
 
       if content = @file_cache[class_symbol.file]?
         members = extract_type_members(content, class_name, "class")
@@ -81,7 +81,7 @@ module Liger
         break if struct_symbol
       end
 
-      return nil unless struct_symbol
+      return unless struct_symbol
 
       if content = @file_cache[struct_symbol.file]?
         members = extract_type_members(content, struct_name, "struct")
@@ -139,7 +139,7 @@ module Liger
     end
 
     def get_enum_values(enum_name : String, enum_file : String) : String?
-      return nil unless File.exists?(enum_file)
+      return unless File.exists?(enum_file)
 
       content = @file_cache[enum_file]? || File.read(enum_file)
       lines = content.split('\n')
@@ -481,11 +481,11 @@ module Liger
 
     def get_type_at_position(uri : String, source : String, position : LSP::Position) : String?
       lines = source.split('\n')
-      return nil if position.line >= lines.size
+      return if position.line >= lines.size
 
       line = lines[position.line]
       word = extract_word_at_position(line, position.character)
-      return nil unless word
+      return unless word
 
       if word.match(/^[A-Z]\w*$/)
         return word
@@ -1273,7 +1273,7 @@ module Liger
     end
 
     private def extract_word_at_position(line : String, char : Int32) : String?
-      return nil if char < 0 || char > line.size
+      return if char < 0 || char > line.size
 
       start_pos = char
       while start_pos > 0 && word_char?(line[start_pos - 1])
@@ -1285,7 +1285,7 @@ module Liger
         end_pos += 1
       end
 
-      return nil if start_pos == end_pos
+      return if start_pos == end_pos
       line[start_pos...end_pos]
     end
 
@@ -1509,20 +1509,20 @@ module Liger
     end
 
     private def extract_word_before_position(line : String, pos : Int32) : String?
-      return nil if pos <= 0
+      return if pos <= 0
 
       end_pos = pos - 1
       while end_pos >= 0 && line[end_pos].whitespace?
         end_pos -= 1
       end
-      return nil if end_pos < 0
+      return if end_pos < 0
 
       start_pos = end_pos
       while start_pos > 0 && word_char?(line[start_pos - 1])
         start_pos -= 1
       end
 
-      return nil if start_pos == end_pos + 1
+      return if start_pos == end_pos + 1
       line[start_pos..end_pos]
     end
 
@@ -1590,10 +1590,10 @@ module Liger
     # Find a member (enum value, constant, nested class, etc.) within a file
     private def find_member_in_file(file_path : String, member_name : String, parent_line : Int32) : SymbolInfo?
       content = @file_cache[file_path]?
-      return nil unless content
+      return unless content
 
       lines = content.split('\n')
-      return nil if parent_line >= lines.size
+      return if parent_line >= lines.size
 
       parent_indent = lines[parent_line].size - lines[parent_line].lstrip.size
 

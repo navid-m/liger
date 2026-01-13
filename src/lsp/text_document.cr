@@ -101,10 +101,10 @@ module LSP
     # Get a word at a position in the text document
     def get_word_at_position(position : Position) : String?
       line = get_line(position.line)
-      return nil unless line
+      return unless line
 
       char = position.character
-      return nil if char < 0 || char > line.size
+      return if char < 0 || char > line.size
 
       start_pos = char
       while start_pos > 0 && word_char?(line[start_pos - 1])
@@ -116,7 +116,7 @@ module LSP
         end_pos += 1
       end
 
-      return nil if start_pos == end_pos
+      return if start_pos == end_pos
       line[start_pos...end_pos]
     end
 

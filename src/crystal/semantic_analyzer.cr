@@ -116,10 +116,10 @@ module Liger
 
     def find_definition(uri : String, position : LSP::Position) : LSP::Location?
       source = @sources[uri]?
-      return nil unless source
+      return unless source
       lines = get_lines(uri)
-      return nil unless lines
-      return nil if position.line >= lines.size
+      return unless lines
+      return if position.line >= lines.size
 
       line_text = lines[position.line]
 
@@ -133,7 +133,7 @@ module Liger
 
       word = extract_qualified_name_at_position(line_text, position.character)
 
-      return nil unless word
+      return unless word
 
       {% if flag?(:debug) %}
         STDERR.puts "Find definition for: '#{word}' at #{position.line}:#{position.character}"
@@ -281,11 +281,11 @@ module Liger
 
     def hover(uri : String, position : LSP::Position) : LSP::Hover?
       source = @sources[uri]?
-      return nil unless source
+      return unless source
 
       lines = get_lines(uri)
-      return nil unless lines
-      return nil if position.line >= lines.size
+      return unless lines
+      return if position.line >= lines.size
 
       line_text = lines[position.line]
 
@@ -348,11 +348,11 @@ module Liger
 
     def signature_help(uri : String, position : LSP::Position) : LSP::SignatureHelp?
       source = @sources[uri]?
-      return nil unless source
+      return unless source
 
       lines = get_lines(uri)
-      return nil unless lines
-      return nil if position.line >= lines.size
+      return unless lines
+      return if position.line >= lines.size
 
       line_text = lines[position.line]
       prefix = line_text[0...position.character]
@@ -620,15 +620,15 @@ module Liger
       new_name : String,
     ) : LSP::WorkspaceEdit?
       source = @sources[uri]?
-      return nil unless source
+      return unless source
 
       lines = get_lines(uri)
-      return nil unless lines
-      return nil if position.line >= lines.size
+      return unless lines
+      return if position.line >= lines.size
 
       current_line = lines[position.line]
       char = position.character
-      return nil if char < 0 || char > current_line.size
+      return if char < 0 || char > current_line.size
 
       start_pos = char
       while start_pos > 0 && word_char?(current_line[start_pos - 1])
@@ -640,7 +640,7 @@ module Liger
         end_pos += 1
       end
 
-      return nil if start_pos == end_pos
+      return if start_pos == end_pos
 
       old_name = current_line[start_pos...end_pos]
 
@@ -665,7 +665,7 @@ module Liger
         end
       end
 
-      return nil if edits.empty?
+      return if edits.empty?
 
       changes = {uri => edits}
       LSP::WorkspaceEdit.new(changes)
@@ -772,7 +772,7 @@ module Liger
     end
 
     private def find_main_file(current_file : String) : String?
-      return nil unless @workspace_root
+      return unless @workspace_root
 
       if @main_file_cache && @main_file_cache_time
         if (Time.utc - @main_file_cache_time.not_nil!).total_seconds < 5
@@ -840,7 +840,7 @@ module Liger
     end
 
     private def extract_word_at_position(line : String, char : Int32) : String?
-      return nil if char < 0 || char > line.size
+      return if char < 0 || char > line.size
       start_pos = char
 
       if char > 0 && line[char - 1] == '@'
@@ -861,19 +861,19 @@ module Liger
         end_pos += 1
       end
 
-      return nil if start_pos == end_pos
+      return if start_pos == end_pos
       word = line[start_pos...end_pos]
 
       if word.ends_with?('?') || word.ends_with?('!')
         word = word[0...-1]
       end
 
-      return nil if word.empty?
+      return if word.empty?
       word
     end
 
     private def extract_qualified_name_at_position(line : String, char : Int32) : String?
-      return nil if char < 0 || char > line.size
+      return if char < 0 || char > line.size
 
       start_pos = char
       while start_pos > 0
@@ -899,14 +899,14 @@ module Liger
         end
       end
 
-      return nil if start_pos == end_pos
+      return if start_pos == end_pos
       word = line[start_pos...end_pos]
 
       if word.ends_with?('?') || word.ends_with?('!')
         word = word[0...-1]
       end
 
-      return nil if word.empty?
+      return if word.empty?
       word
     end
 
@@ -916,14 +916,14 @@ module Liger
       position : LSP::Position,
       uri : String,
     ) : LSP::Location?
-      return nil unless line.strip.starts_with?("require")
+      return unless line.strip.starts_with?("require")
 
       if match = line.match(/require\s+["']([^"']+)["']/)
         require_path = match[1]
 
         quote_start = match.begin(1)
         quote_end = match.end(1)
-        return nil if position.character < quote_start || position.character > quote_end
+        return if position.character < quote_start || position.character > quote_end
 
         STDERR.puts "Found require statement for: #{require_path}"
 
@@ -995,14 +995,14 @@ module Liger
       source : String,
       uri : String,
     ) : LSP::Location?
-      return nil unless line.strip.starts_with?("fun") || line.includes?(" fun ")
+      return unless line.strip.starts_with?("fun") || line.includes?(" fun ")
 
       if match = line.match(/fun\s+(\w+)/)
         fun_name = match[1]
         fun_start = match.begin(1)
         fun_end = match.end(1)
 
-        return nil if position.character < fun_start || position.character > fun_end
+        return if position.character < fun_start || position.character > fun_end
 
         range = LSP::Range.new(
           LSP::Position.new(position.line, fun_start),
@@ -1021,14 +1021,14 @@ module Liger
       position : LSP::Position,
       uri : String,
     ) : LSP::Hover?
-      return nil unless line.strip.starts_with?("require")
+      return unless line.strip.starts_with?("require")
 
       if match = line.match(/require\s+["']([^"']+)["']/)
         require_path = match[1]
         quote_start = match.begin(1)
         quote_end = match.end(1)
 
-        return nil if position.character < quote_start || position.character > quote_end
+        return if position.character < quote_start || position.character > quote_end
 
         if location = resolve_require_path(require_path, uri)
           resolved_file = uri_to_filename(location.uri)
@@ -1071,14 +1071,14 @@ module Liger
       position : LSP::Position,
       source : String,
     ) : LSP::Hover?
-      return nil unless line.strip.starts_with?("fun") || line.includes?(" fun ")
+      return unless line.strip.starts_with?("fun") || line.includes?(" fun ")
 
       if match = line.match(/fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
         fun_name = match[1]
         fun_start = match.begin(1)
         fun_end = match.end(1)
 
-        return nil if position.character < fun_start || position.character > fun_end + 10
+        return if position.character < fun_start || position.character > fun_end + 10
 
         actual_name = match[2]?
         args = match[3]? || "()"
@@ -1458,12 +1458,12 @@ module Liger
       position : LSP::Position,
     ) : LSP::Hover?
       lines = get_lines(uri)
-      return nil unless lines
-      return nil if position.line >= lines.size
+      return unless lines
+      return if position.line >= lines.size
 
       line_text = lines[position.line]
       word = extract_qualified_name_at_position(line_text, position.character)
-      return nil unless word
+      return unless word
 
       local_result = find_local_variable_or_parameter(source, word, position, uri)
       if local_result[1]
@@ -2012,20 +2012,20 @@ module Liger
     end
 
     private def extract_word_before_dot(line : String, dot_pos : Int32) : String?
-      return nil if dot_pos <= 0
+      return if dot_pos <= 0
 
       end_pos = dot_pos - 1
       while end_pos >= 0 && line[end_pos].whitespace?
         end_pos -= 1
       end
-      return nil if end_pos < 0
+      return if end_pos < 0
 
       start_pos = end_pos
       while start_pos > 0 && word_char?(line[start_pos - 1])
         start_pos -= 1
       end
 
-      return nil if start_pos == end_pos + 1
+      return if start_pos == end_pos + 1
       line[start_pos..end_pos]
     end
 
@@ -2192,14 +2192,14 @@ module Liger
       end
 
       private def infer_receiver_type(obj : Crystal::ASTNode?, location : Crystal::Location) : String?
-        return nil unless obj
+        return unless obj
 
         if obj.is_a?(Crystal::Var)
           return obj.name.capitalize
         elsif obj.is_a?(Crystal::Path)
           return obj.names.join("::")
         elsif obj.is_a?(Crystal::InstanceVar)
-          return nil
+          return
         end
 
         nil

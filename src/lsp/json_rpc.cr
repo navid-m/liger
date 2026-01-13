@@ -150,7 +150,7 @@ module LSP
       end
 
       content_length = headers["Content-Length"]?.try(&.to_i)
-      return nil unless content_length
+      return unless content_length
 
       content = @input.read_string(content_length)
       JSON.parse(content)
