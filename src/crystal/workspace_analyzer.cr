@@ -1535,7 +1535,7 @@ module Liger
         return find_instance_variable_type(source, receiver)
       end
 
-      return find_variable_type(source, receiver, current_line)
+      find_variable_type(source, receiver, current_line)
     end
 
     private def get_method_return_type(receiver_type : String, method_name : String) : String?
