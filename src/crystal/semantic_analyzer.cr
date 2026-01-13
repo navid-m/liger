@@ -648,7 +648,7 @@ module Liger
 
       lines.each_with_index do |line, line_num|
         offset = 0
-        while (index = line.index(old_name, offset))
+        while index = line.index(old_name, offset)
           before_ok = index == 0 || !word_char?(line[index - 1])
           after_ok = index + old_name.size >= line.size ||
                      !word_char?(line[index + old_name.size])
