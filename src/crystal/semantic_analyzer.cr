@@ -216,8 +216,8 @@ module Liger
       end
 
       filename = uri_to_filename(uri)
-      line = position.line + 1
-      column = position.character + 1
+      line_num = position.line + 1
+      column_num = position.character + 1
 
       begin
         output_io = IO::Memory.new
@@ -227,10 +227,10 @@ module Liger
 
         if source = @sources[uri]
           temp_file = get_temp_file_for_uri(uri, source)
-          cursor_loc = "#{temp_file}:#{line}:#{column}"
+          cursor_loc = "#{temp_file}:#{line_num}:#{column_num}"
           args << cursor_loc
         else
-          cursor_loc = "#{filename}:#{line}:#{column}"
+          cursor_loc = "#{filename}:#{line_num}:#{column_num}"
           args << cursor_loc
         end
 
@@ -626,23 +626,23 @@ module Liger
       return nil unless lines
       return nil if position.line >= lines.size
 
-      line = lines[position.line]
+      current_line = lines[position.line]
       char = position.character
-      return nil if char < 0 || char > line.size
+      return nil if char < 0 || char > current_line.size
 
       start_pos = char
-      while start_pos > 0 && word_char?(line[start_pos - 1])
+      while start_pos > 0 && word_char?(current_line[start_pos - 1])
         start_pos -= 1
       end
 
       end_pos = char
-      while end_pos < line.size && word_char?(line[end_pos])
+      while end_pos < current_line.size && word_char?(current_line[end_pos])
         end_pos += 1
       end
 
       return nil if start_pos == end_pos
 
-      old_name = line[start_pos...end_pos]
+      old_name = current_line[start_pos...end_pos]
 
       edits = [] of LSP::TextEdit
 

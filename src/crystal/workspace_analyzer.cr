@@ -1362,8 +1362,8 @@ module Liger
       current_uri : String,
       current_source : String,
     ) : SymbolInfo?
-      if symbol = find_property_in_source(current_source, property_name, current_uri)
-        return symbol
+      if found_symbol = find_property_in_source(current_source, property_name, current_uri)
+        return found_symbol
       end
 
       scan_workspace_if_needed
