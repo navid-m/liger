@@ -41,7 +41,7 @@ module Liger
 
     def update_source(uri : String, source : String)
       @sources[uri] = source
-      @source_lines_cache[uri] = source.split('\n'.to_i)
+      @source_lines_cache[uri] = source.split('\n')
       @workspace_analyzer.update_source(uri, source)
       @workspace_analyzer.force_scan
     end
@@ -246,7 +246,7 @@ module Liger
         STDERR.puts "find_definition output: #{output}" unless output.empty?
         STDERR.puts "find_definition error: #{error}" unless error.empty?
 
-        lines = output.split('\n'.to_i)
+        lines = output.split('\n')
 
         lines.each do |line|
           if match = line.match(/^(.+):(\d+):(\d+)/)
