@@ -18,6 +18,13 @@ describe LSP::Position do
       (pos1 <=> pos2).should eq(-1)
       (pos2 <=> pos1).should eq(1)
     end
+
+    it "checks equality" do
+      pos1 = LSP::Position.new(3, 15)
+      pos2 = LSP::Position.new(3, 15)
+
+      (pos1 == pos2).should be_true
+    end
   end
 end
 
@@ -36,6 +43,19 @@ describe LSP::Range do
       range.contains?(LSP::Position.new(1, 15)).should be_false
       range.contains?(LSP::Position.new(0, 7)).should be_false
       range.contains?(LSP::Position.new(2, 7)).should be_false
+    end
+
+    it "checks if position is within multiline range" do
+      range = LSP::Range.new(
+        LSP::Position.new(1, 5),
+        LSP::Position.new(3, 5)
+      )
+
+      range.contains?(LSP::Position.new(1, 5)).should be_true
+      range.contains?(LSP::Position.new(2, 0)).should be_true
+      range.contains?(LSP::Position.new(3, 5)).should be_true
+      range.contains?(LSP::Position.new(1, 4)).should be_false
+      range.contains?(LSP::Position.new(3, 6)).should be_false
     end
   end
 end
@@ -97,5 +117,40 @@ describe LSP::DocumentSymbol do
     symbol.kind.should eq(LSP::SymbolKind::Class)
     symbol.range.should eq(range)
     symbol.selection_range.should eq(selection_range)
+  end
+end
+
+describe LSP::Location do
+  it "creates a location" do
+    range = LSP::Range.new(
+      LSP::Position.new(0, 0),
+      LSP::Position.new(1, 1)
+    )
+    location = LSP::Location.new("file:///test.cr", range)
+
+    location.uri.should eq("file:///test.cr")
+    location.range.should eq(range)
+  end
+end
+
+describe LSP::TextEdit do
+  it "creates a text edit" do
+    range = LSP::Range.new(
+      LSP::Position.new(0, 0),
+      LSP::Position.new(0, 5)
+    )
+    edit = LSP::TextEdit.new(range, "new text")
+
+    edit.range.should eq(range)
+    edit.new_text.should eq("new text")
+  end
+end
+
+describe LSP::Hover do
+  it "creates a hover result" do
+    content = LSP::MarkupContent.new("markdown", "**bold**")
+    hover = LSP::Hover.new(content)
+
+    hover.contents.should eq(content)
   end
 end
