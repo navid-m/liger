@@ -1,5 +1,5 @@
-require "./spec_helper"
-require "../src/crystal/semantic_analyzer"
+require "../spec_helper"
+require "../../src/crystal/semantic_analyzer"
 
 describe Liger::SemanticAnalyzer do
   it "finds definition of instance variable" do
