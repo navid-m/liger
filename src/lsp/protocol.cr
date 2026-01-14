@@ -343,7 +343,10 @@ module LSP
     property documentation : String | MarkupContent?
     property? parameters : Array(ParameterInformation)?
 
-    def initialize(@label : String, @documentation : String | MarkupContent? = nil)
+    def initialize(
+      @label : String,
+      @documentation : String | MarkupContent? = nil,
+    )
     end
   end
 
