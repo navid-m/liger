@@ -992,7 +992,15 @@ module Liger
 
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
-          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.present?
+          symbols << SymbolInfo.new(
+            full_name,
+            return_type.strip,
+            "fun",
+            file_path,
+            line_num,
+            signature,
+            doc
+          ) if current_namespace.present?
         elsif match = line.match(/^\s*annotation\s+([\w:]+)/)
           current_namespace.push("__annotation__")
           namespace_indent_levels.push(line_indent)
