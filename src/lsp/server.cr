@@ -68,7 +68,7 @@ module LSP
         if init_options = params["initializationOptions"]?
           if strict_checking = init_options["strictTypeChecking"]?
             @semantic_analyzer.enable_strict_type_checking = strict_checking.as_bool? || false
-            STDERR.puts "Strict type checking: #{@semantic_analyzer.enable_strict_type_checking}"
+            STDERR.puts "Strict type checking: #{@semantic_analyzer.enable_strict_type_checking?}"
           end
         end
       end
@@ -184,7 +184,7 @@ module LSP
       semantic_items = @semantic_analyzer.completions(doc.uri, completion_params.position)
       items += semantic_items
 
-      items = items.uniq { |item| item.label }
+      items = items.uniq(&.label)
 
       json_response = items.to_json
 

@@ -62,7 +62,7 @@ module Liger
         break if class_symbol
       end
 
-      return nil unless class_symbol
+      return unless class_symbol
 
       if content = @file_cache[class_symbol.file]?
         members = extract_type_members(content, class_name, "class")
@@ -81,7 +81,7 @@ module Liger
         break if struct_symbol
       end
 
-      return nil unless struct_symbol
+      return unless struct_symbol
 
       if content = @file_cache[struct_symbol.file]?
         members = extract_type_members(content, struct_name, "struct")
@@ -139,7 +139,7 @@ module Liger
     end
 
     def get_enum_values(enum_name : String, enum_file : String) : String?
-      return nil unless File.exists?(enum_file)
+      return unless File.exists?(enum_file)
 
       content = @file_cache[enum_file]? || File.read(enum_file)
       lines = content.split('\n')
@@ -374,7 +374,7 @@ module Liger
         end
       end
 
-      results.uniq { |s| s.name }
+      results.uniq(&.name)
     end
 
     def get_lib_functions(lib_name : String) : Array(SymbolInfo)
@@ -481,11 +481,11 @@ module Liger
 
     def get_type_at_position(uri : String, source : String, position : LSP::Position) : String?
       lines = source.split('\n')
-      return nil if position.line >= lines.size
+      return if position.line >= lines.size
 
       line = lines[position.line]
       word = extract_word_at_position(line, position.character)
-      return nil unless word
+      return unless word
 
       if word.match(/^[A-Z]\w*$/)
         return word
@@ -526,10 +526,11 @@ module Liger
     end
 
     private def scan_workspace_if_needed
-      return unless @workspace_root
-      return if @last_scan_time && (Time.utc - @last_scan_time.not_nil!).total_seconds < 5
+      return unless workspace_root = @workspace_root
+      return if (last_scan_time = @last_scan_time) &&
+                (Time.utc - last_scan_time).total_seconds < 5
 
-      workspace_path = uri_to_filename(@workspace_root.not_nil!)
+      workspace_path = uri_to_filename(workspace_root)
       return unless Dir.exists?(workspace_path)
 
       STDERR.puts "Scanning workspace: #{workspace_path}"
@@ -707,7 +708,7 @@ module Liger
         elsif match = line.match(/^\s*annotation\s+(\w+)/)
           current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
-          current_namespace.pop if current_namespace.any?
+          current_namespace.pop if current_namespace.present?
         elsif match = line.match(/^\s*def\s+(?:self\.)?(\w+)(?:\([^)]*\))?\s*(?::\s*(\w+))?/)
           method_name = match[1]
           return_type = match[2]? || "Void"
@@ -804,7 +805,7 @@ module Liger
             parent_class,
             "class",
             file_path,
-            line_num, line.strip, doc) if current_namespace.any?
+            line_num, line.strip, doc) if current_namespace.present?
           current_namespace.push(class_name)
         elsif match = line.match(/^\s*module\s+(\w+)/)
           module_name = match[1]
@@ -814,7 +815,7 @@ module Liger
             module_name, "Module", "module", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
             full_name, "Module", "module", file_path, line_num, line.strip, doc
-          ) if current_namespace.any?
+          ) if current_namespace.present?
           current_namespace.push(module_name)
         elsif match = line.match(/^\s*lib\s+(\w+)/)
           lib_name = match[1]
@@ -823,7 +824,7 @@ module Liger
           symbols << SymbolInfo.new(lib_name, "Lib", "lib", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
             full_name, "Lib", "lib", file_path, line_num, line.strip, doc
-          ) if current_namespace.any?
+          ) if current_namespace.present?
           current_namespace.push(lib_name)
         elsif match = line.match(/^\s*fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
           fun_name = match[1]
@@ -840,11 +841,11 @@ module Liger
 
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
-          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.present?
         elsif match = line.match(/^\s*annotation\s+(\w+)/)
           current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
-          current_namespace.pop if current_namespace.any?
+          current_namespace.pop if current_namespace.present?
         end
 
         scan_line_for_symbols(line, line_num, file_path, current_namespace, symbols, lines)
@@ -868,7 +869,7 @@ module Liger
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new(enum_name, "Enum", "enum", file_path, line_num, line.strip, doc)
         symbols << SymbolInfo.new(
-          full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.any?
+          full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.present?
       end
 
       # Struct definitions
@@ -878,7 +879,7 @@ module Liger
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new(struct_name, "Struct", "struct", file_path, line_num, line.strip, doc)
         symbols << SymbolInfo.new(
-          full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.any?
+          full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.present?
       end
 
       # Method definitions
@@ -903,7 +904,7 @@ module Liger
         full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new("@#{prop_name}", prop_type, prop_kind, file_path, line_num, line.strip, doc)
-        symbols << SymbolInfo.new(full_prop_name, prop_type, prop_kind, file_path, line_num, line.strip, doc) if current_namespace.any?
+        symbols << SymbolInfo.new(full_prop_name, prop_type, prop_kind, file_path, line_num, line.strip, doc) if current_namespace.present?
       end
 
       # Instance variables
@@ -915,7 +916,7 @@ module Liger
         symbols << SymbolInfo.new(
           var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc)
         symbols << SymbolInfo.new(
-          full_var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc) if current_namespace.any?
+          full_var_name, var_type, "instance_variable", file_path, line_num, line.strip, doc) if current_namespace.present?
       end
 
       # Constants
@@ -927,7 +928,7 @@ module Liger
         doc = extract_documentation(lines, line_num)
         symbols << SymbolInfo.new(const_name, const_type, "constant", file_path, line_num, line.strip, doc)
         symbols << SymbolInfo.new(
-          full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.any?
+          full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.present?
       end
     end
 
@@ -955,7 +956,7 @@ module Liger
           symbols << SymbolInfo.new(
             current_class, parent_class, "class", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.any?
+            full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.present?
           current_namespace.push(current_class)
           namespace_indent_levels.push(line_indent)
         elsif match = line.match(/^\s*module\s+(\w+)/)
@@ -964,7 +965,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(current_module, "Module", "module", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.any?
+            full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.present?
           current_namespace.push(current_module)
           namespace_indent_levels.push(line_indent)
         elsif match = line.match(/^\s*lib\s+(\w+)/)
@@ -973,7 +974,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(lib_name, "Lib", "lib", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, "Lib", "lib", file_path, line_num, line.strip, doc) if current_namespace.any?
+            full_name, "Lib", "lib", file_path, line_num, line.strip, doc) if current_namespace.present?
           current_namespace.push(lib_name)
           namespace_indent_levels.push(line_indent)
         elsif match = line.match(/^\s*fun\s+(\w+)(?:\s*=\s*(\w+))?\s*(\([^)]*\))?\s*(?::\s*(.+))?/)
@@ -991,12 +992,12 @@ module Liger
 
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
-          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.present?
         elsif match = line.match(/^\s*annotation\s+(\w+)/)
           current_namespace.push("__annotation__")
           namespace_indent_levels.push(line_indent)
         elsif line.match(/^\s*end\s*$/)
-          if current_namespace.any? && namespace_indent_levels.any?
+          if current_namespace.present? && namespace_indent_levels.present?
             last_indent = namespace_indent_levels.last
             if line_indent <= last_indent
               popped = current_namespace.pop
@@ -1017,7 +1018,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(enum_name, "Enum", "enum", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.any?
+            full_name, "Enum", "enum", file_path, line_num, line.strip, doc) if current_namespace.present?
         end
 
         # Struct definitions
@@ -1027,7 +1028,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(struct_name, "Struct", "struct", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.any?
+            full_name, "Struct", "struct", file_path, line_num, line.strip, doc) if current_namespace.present?
         end
 
         # Alias definitions
@@ -1038,7 +1039,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(alias_name, alias_type, "alias", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, alias_type, "alias", file_path, line_num, line.strip, doc) if current_namespace.any?
+            full_name, alias_type, "alias", file_path, line_num, line.strip, doc) if current_namespace.present?
         end
 
         # Constants
@@ -1050,7 +1051,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(const_name, const_type, "constant", file_path, line_num, line.strip, doc)
           symbols << SymbolInfo.new(
-            full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.any?
+            full_name, const_type, "constant", file_path, line_num, line.strip, doc) if current_namespace.present?
         end
 
         # Property declarations (property, getter, setter)
@@ -1060,21 +1061,21 @@ module Liger
           full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new("@#{prop_name}", prop_type, "property", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_prop_name, prop_type, "property", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(full_prop_name, prop_type, "property", file_path, line_num, line.strip, doc) if current_namespace.present?
         elsif match = line.match(/^\s*getter\s+(\w+)\s*:\s*(\w+)/)
           prop_name = match[1]
           prop_type = match[2]
           full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new("@#{prop_name}", prop_type, "getter", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_prop_name, prop_type, "getter", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(full_prop_name, prop_type, "getter", file_path, line_num, line.strip, doc) if current_namespace.present?
         elsif match = line.match(/^\s*setter\s+(\w+)\s*:\s*(\w+)/)
           prop_name = match[1]
           prop_type = match[2]
           full_prop_name = current_namespace.empty? ? "@#{prop_name}" : "#{current_namespace.join("::")}::@#{prop_name}"
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new("@#{prop_name}", prop_type, "setter", file_path, line_num, line.strip, doc)
-          symbols << SymbolInfo.new(full_prop_name, prop_type, "setter", file_path, line_num, line.strip, doc) if current_namespace.any?
+          symbols << SymbolInfo.new(full_prop_name, prop_type, "setter", file_path, line_num, line.strip, doc) if current_namespace.present?
         end
 
         # Method definitions with return types
@@ -1273,7 +1274,7 @@ module Liger
     end
 
     private def extract_word_at_position(line : String, char : Int32) : String?
-      return nil if char < 0 || char > line.size
+      return if char < 0 || char > line.size
 
       start_pos = char
       while start_pos > 0 && word_char?(line[start_pos - 1])
@@ -1285,7 +1286,7 @@ module Liger
         end_pos += 1
       end
 
-      return nil if start_pos == end_pos
+      return if start_pos == end_pos
       line[start_pos...end_pos]
     end
 
@@ -1362,8 +1363,8 @@ module Liger
       current_uri : String,
       current_source : String,
     ) : SymbolInfo?
-      if symbol = find_property_in_source(current_source, property_name, current_uri)
-        return symbol
+      if found_symbol = find_property_in_source(current_source, property_name, current_uri)
+        return found_symbol
       end
 
       scan_workspace_if_needed
@@ -1454,7 +1455,7 @@ module Liger
       nil
     end
 
-    private def is_method_available_for_type(
+    private def method_available_for_type?(
       symbol : SymbolInfo,
       receiver_type : String,
     ) : Bool
@@ -1509,20 +1510,20 @@ module Liger
     end
 
     private def extract_word_before_position(line : String, pos : Int32) : String?
-      return nil if pos <= 0
+      return if pos <= 0
 
       end_pos = pos - 1
       while end_pos >= 0 && line[end_pos].whitespace?
         end_pos -= 1
       end
-      return nil if end_pos < 0
+      return if end_pos < 0
 
       start_pos = end_pos
       while start_pos > 0 && word_char?(line[start_pos - 1])
         start_pos -= 1
       end
 
-      return nil if start_pos == end_pos + 1
+      return if start_pos == end_pos + 1
       line[start_pos..end_pos]
     end
 
@@ -1535,7 +1536,7 @@ module Liger
         return find_instance_variable_type(source, receiver)
       end
 
-      return find_variable_type(source, receiver, current_line)
+      find_variable_type(source, receiver, current_line)
     end
 
     private def get_method_return_type(receiver_type : String, method_name : String) : String?
@@ -1590,10 +1591,10 @@ module Liger
     # Find a member (enum value, constant, nested class, etc.) within a file
     private def find_member_in_file(file_path : String, member_name : String, parent_line : Int32) : SymbolInfo?
       content = @file_cache[file_path]?
-      return nil unless content
+      return unless content
 
       lines = content.split('\n')
-      return nil if parent_line >= lines.size
+      return if parent_line >= lines.size
 
       parent_indent = lines[parent_line].size - lines[parent_line].lstrip.size
 

@@ -58,7 +58,7 @@ module LSP
     Hint        = 4
 
     def to_json(json : JSON::Builder)
-      json.number(self.value)
+      json.number(value)
     end
   end
 
@@ -68,7 +68,7 @@ module LSP
 
     property range : Range
     property severity : DiagnosticSeverity?
-    property code : String | Int32 | Nil
+    property code : String | Int32?
     property source : String?
     property message : String
     property? tags : Array(Int32)?
@@ -190,7 +190,7 @@ module LSP
     TypeParameter = 25
 
     def to_json(json : JSON::Builder)
-      json.number(self.value)
+      json.number(value)
     end
   end
 
@@ -269,7 +269,7 @@ module LSP
     TypeParameter = 26
 
     def to_json(json : JSON::Builder)
-      json.number(self.value)
+      json.number(value)
     end
   end
 
@@ -337,10 +337,10 @@ module LSP
     include JSON::Serializable
 
     property label : String
-    property documentation : String | MarkupContent | Nil
+    property documentation : String | MarkupContent?
     property? parameters : Array(ParameterInformation)?
 
-    def initialize(@label : String, @documentation : String | MarkupContent | Nil = nil)
+    def initialize(@label : String, @documentation : String | MarkupContent? = nil)
     end
   end
 
@@ -349,7 +349,7 @@ module LSP
     include JSON::Serializable
 
     property label : String | Array(Int32)
-    property documentation : String | MarkupContent | Nil
+    property documentation : String | MarkupContent?
 
     def initialize(@label : String | Array(Int32))
     end

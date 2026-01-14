@@ -195,13 +195,11 @@ module Liger
     end
 
     private def add_file_symbols(items : Array(LSP::CompletionItem))
-      begin
-        parser = ::Crystal::Parser.new(@source)
-        parser.filename = @uri
-        node = parser.parse
-        extract_completions(node, items)
-      rescue
-      end
+      parser = ::Crystal::Parser.new(@source)
+      parser.filename = @uri
+      node = parser.parse
+      extract_completions(node, items)
+    rescue
     end
 
     private def extract_completions(

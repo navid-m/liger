@@ -5,7 +5,7 @@ describe LSP::Position do
     it "compares positions on the same line" do
       pos1 = LSP::Position.new(1, 5)
       pos2 = LSP::Position.new(1, 10)
-      
+
       (pos1 <=> pos2).should eq(-1)
       (pos2 <=> pos1).should eq(1)
       (pos1 <=> pos1).should eq(0)
@@ -14,7 +14,7 @@ describe LSP::Position do
     it "compares positions on different lines" do
       pos1 = LSP::Position.new(1, 10)
       pos2 = LSP::Position.new(2, 5)
-      
+
       (pos1 <=> pos2).should eq(-1)
       (pos2 <=> pos1).should eq(1)
     end
@@ -28,7 +28,7 @@ describe LSP::Range do
         LSP::Position.new(1, 5),
         LSP::Position.new(1, 10)
       )
-      
+
       range.contains?(LSP::Position.new(1, 7)).should be_true
       range.contains?(LSP::Position.new(1, 5)).should be_true
       range.contains?(LSP::Position.new(1, 10)).should be_true
@@ -46,14 +46,14 @@ describe LSP::Diagnostic do
       LSP::Position.new(0, 0),
       LSP::Position.new(0, 5)
     )
-    
+
     diagnostic = LSP::Diagnostic.new(
       range,
       "Test error message",
       LSP::DiagnosticSeverity::Error,
       "test"
     )
-    
+
     diagnostic.range.should eq(range)
     diagnostic.message.should eq("Test error message")
     diagnostic.severity.should eq(LSP::DiagnosticSeverity::Error)
@@ -68,7 +68,7 @@ describe LSP::CompletionItem do
       LSP::CompletionItemKind::Method,
       "A test method"
     )
-    
+
     item.label.should eq("test_method")
     item.kind.should eq(LSP::CompletionItemKind::Method)
     item.detail.should eq("A test method")
@@ -85,14 +85,14 @@ describe LSP::DocumentSymbol do
       LSP::Position.new(0, 6),
       LSP::Position.new(0, 15)
     )
-    
+
     symbol = LSP::DocumentSymbol.new(
       "TestClass",
       LSP::SymbolKind::Class,
       range,
       selection_range
     )
-    
+
     symbol.name.should eq("TestClass")
     symbol.kind.should eq(LSP::SymbolKind::Class)
     symbol.range.should eq(range)
