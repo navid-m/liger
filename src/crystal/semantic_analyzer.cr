@@ -887,6 +887,13 @@ module Liger
         end
       end
 
+      if start_pos > 0 && line[start_pos - 1] == '@'
+        start_pos -= 1
+        if start_pos > 0 && line[start_pos - 1] == '@'
+          start_pos -= 1
+        end
+      end
+
       end_pos = char
       while end_pos < line.size
         curr_char = line[end_pos]
