@@ -646,7 +646,7 @@ module Liger
       current_namespace = [] of String
 
       lines.each_with_index do |line, line_num|
-        if match = line.match(/^\s*class\s+(\w+)(?:\s*<\s*(\w+))?/)
+        if match = line.match(/^\s*class\s+([\w:]+)(?:\s*<\s*([\w:]+))?/)
           class_name = match[1]
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [class_name]).join("::")
@@ -655,7 +655,7 @@ module Liger
           symbols << SymbolInfo.new(full_name, parent_class, "class", file_path, line_num, line.strip, doc)
 
           current_namespace.push(class_name)
-        elsif match = line.match(/^\s*module\s+(\w+)/)
+        elsif match = line.match(/^\s*module\s+([\w:]+)/)
           module_name = match[1]
           full_name = (current_namespace + [module_name]).join("::")
           doc = extract_documentation(lines, line_num)
@@ -663,7 +663,7 @@ module Liger
           symbols << SymbolInfo.new(full_name, "Module", "module", file_path, line_num, line.strip, doc)
 
           current_namespace.push(module_name)
-        elsif match = line.match(/^\s*struct\s+(\w+)/)
+        elsif match = line.match(/^\s*struct\s+([\w:]+)/)
           struct_name = match[1]
           full_name = (current_namespace + [struct_name]).join("::")
           doc = extract_documentation(lines, line_num)
@@ -671,7 +671,7 @@ module Liger
           symbols << SymbolInfo.new(full_name, "Struct", "struct", file_path, line_num, line.strip, doc)
 
           current_namespace.push(struct_name)
-        elsif match = line.match(/^\s*enum\s+(\w+)/)
+        elsif match = line.match(/^\s*enum\s+([\w:]+)/)
           enum_name = match[1]
           full_name = (current_namespace + [enum_name]).join("::")
           doc = extract_documentation(lines, line_num)
@@ -679,7 +679,7 @@ module Liger
           symbols << SymbolInfo.new(full_name, "Enum", "enum", file_path, line_num, line.strip, doc)
 
           current_namespace.push(enum_name)
-        elsif match = line.match(/^\s*lib\s+(\w+)/)
+        elsif match = line.match(/^\s*lib\s+([\w:]+)/)
           # Track lib declarations for extern function bindings
           lib_name = match[1]
           full_name = (current_namespace + [lib_name]).join("::")
@@ -705,7 +705,7 @@ module Liger
 
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc)
-        elsif match = line.match(/^\s*annotation\s+(\w+)/)
+        elsif match = line.match(/^\s*annotation\s+([\w:]+)/)
           current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.present?
@@ -787,7 +787,7 @@ module Liger
 
       lines.each_with_index do |line, line_num|
         # Track current class/module context
-        if match = line.match(/^\s*class\s+(\w+)(?:\s*<\s*(\w+))?/)
+        if match = line.match(/^\s*class\s+([\w:]+)(?:\s*<\s*([\w:]+))?/)
           class_name = match[1]
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [class_name]).join("::")
@@ -807,7 +807,7 @@ module Liger
             file_path,
             line_num, line.strip, doc) if current_namespace.present?
           current_namespace.push(class_name)
-        elsif match = line.match(/^\s*module\s+(\w+)/)
+        elsif match = line.match(/^\s*module\s+([\w:]+)/)
           module_name = match[1]
           full_name = (current_namespace + [module_name]).join("::")
           doc = extract_documentation(lines, line_num)
@@ -817,7 +817,7 @@ module Liger
             full_name, "Module", "module", file_path, line_num, line.strip, doc
           ) if current_namespace.present?
           current_namespace.push(module_name)
-        elsif match = line.match(/^\s*lib\s+(\w+)/)
+        elsif match = line.match(/^\s*lib\s+([\w:]+)/)
           lib_name = match[1]
           full_name = (current_namespace + [lib_name]).join("::")
           doc = extract_documentation(lines, line_num)
@@ -842,7 +842,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
           symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.present?
-        elsif match = line.match(/^\s*annotation\s+(\w+)/)
+        elsif match = line.match(/^\s*annotation\s+([\w:]+)/)
           current_namespace.push("__annotation__")
         elsif line.match(/^\s*end\s*$/)
           current_namespace.pop if current_namespace.present?
@@ -948,7 +948,7 @@ module Liger
       lines.each_with_index do |line, line_num|
         line_indent = line.size - line.lstrip.size
 
-        if match = line.match(/^\s*class\s+(\w+)(?:\s*<\s*(\w+))?/)
+        if match = line.match(/^\s*class\s+([\w:]+)(?:\s*<\s*([\w:]+))?/)
           current_class = match[1]
           parent_class = match[2]? || "Object"
           full_name = (current_namespace + [current_class]).join("::")
@@ -959,7 +959,7 @@ module Liger
             full_name, parent_class, "class", file_path, line_num, line.strip, doc) if current_namespace.present?
           current_namespace.push(current_class)
           namespace_indent_levels.push(line_indent)
-        elsif match = line.match(/^\s*module\s+(\w+)/)
+        elsif match = line.match(/^\s*module\s+([\w:]+)/)
           current_module = match[1]
           full_name = (current_namespace + [current_module]).join("::")
           doc = extract_documentation(lines, line_num)
@@ -968,7 +968,7 @@ module Liger
             full_name, "Module", "module", file_path, line_num, line.strip, doc) if current_namespace.present?
           current_namespace.push(current_module)
           namespace_indent_levels.push(line_indent)
-        elsif match = line.match(/^\s*lib\s+(\w+)/)
+        elsif match = line.match(/^\s*lib\s+([\w:]+)/)
           lib_name = match[1]
           full_name = (current_namespace + [lib_name]).join("::")
           doc = extract_documentation(lines, line_num)
@@ -993,7 +993,7 @@ module Liger
           doc = extract_documentation(lines, line_num)
           symbols << SymbolInfo.new(fun_name, return_type.strip, "fun", file_path, line_num, signature, doc)
           symbols << SymbolInfo.new(full_name, return_type.strip, "fun", file_path, line_num, signature, doc) if current_namespace.present?
-        elsif match = line.match(/^\s*annotation\s+(\w+)/)
+        elsif match = line.match(/^\s*annotation\s+([\w:]+)/)
           current_namespace.push("__annotation__")
           namespace_indent_levels.push(line_indent)
         elsif line.match(/^\s*end\s*$/)
