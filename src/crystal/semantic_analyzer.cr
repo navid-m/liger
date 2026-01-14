@@ -111,6 +111,11 @@ module Liger
         diagnostics.concat(type_check_diagnostics)
       end
 
+      if ast
+        arg_count_diagnostics = check_argument_counts(ast, uri, source)
+        diagnostics.concat(arg_count_diagnostics)
+      end
+
       diagnostics
     end
 
@@ -357,7 +362,6 @@ module Liger
       line_text = lines[position.line]
       prefix = line_text[0...position.character]
 
-      # Check for lib function calls (e.g., GL.clear()
       if match = prefix.match(/(\w+)\.(\w+)\s*\([^)]*$/)
         lib_name = match[1]
         fun_name = match[2]
@@ -2127,12 +2131,99 @@ module Liger
       diagnostics
     end
 
+    private def check_argument_counts(node : Crystal::ASTNode, uri : String, source : String) : Array(LSP::Diagnostic)
+      diagnostics = [] of LSP::Diagnostic
+      visitor = ArgumentCountChecker.new(uri, source)
+      node.accept(visitor)
+      diagnostics.concat(visitor.diagnostics)
+      diagnostics
+    end
+
+    class ArgumentCountChecker < Crystal::Visitor
+      getter diagnostics : Array(LSP::Diagnostic)
+
+      @local_methods : Hash(String, Int32)
+      @lines : Array(String)
+
+      def initialize(@uri : String, @source : String)
+        @diagnostics = [] of LSP::Diagnostic
+        @lines = @source.split('\n')
+        @local_methods = Hash(String, Int32).new
+        collect_local_methods
+      end
+
+      private def collect_local_methods
+        begin
+          parser = ::Crystal::Parser.new(@source)
+          parser.filename = @uri
+          ast = parser.parse
+          ast.accept(MethodCollector.new(@local_methods))
+        rescue
+        end
+      end
+
+      def visit(node : Crystal::ASTNode)
+        if node.is_a?(Crystal::Call)
+          if location = node.location
+            check_call_argument_count(node, location)
+          end
+        end
+        true
+      end
+
+      private def check_call_argument_count(node : Crystal::Call, location : Crystal::Location)
+        method_name = node.name
+        args = node.args
+        obj = node.obj
+
+        return if obj
+
+        if expected_param_count = @local_methods[method_name]?
+          actual_arg_count = args.size
+
+          if actual_arg_count != expected_param_count
+            line = location.line_number - 1
+            column = location.column_number - 1
+            
+            end_column = column + method_name.size
+
+            range = LSP::Range.new(
+              LSP::Position.new(line, column),
+              LSP::Position.new(line, end_column)
+            )
+
+            message = "Wrong number of arguments for '#{method_name}' (given #{actual_arg_count}, expected #{expected_param_count})"
+            @diagnostics << LSP::Diagnostic.new(
+              range,
+              message,
+              LSP::DiagnosticSeverity::Error,
+              "liger"
+            )
+          end
+        end
+      end
+    end
+
     class ArgumentTypeChecker < Crystal::Visitor
       getter diagnostics : Array(LSP::Diagnostic)
+
+      @local_methods : Hash(String, Int32)
 
       def initialize(@analyzer : SemanticAnalyzer, @workspace_analyzer : WorkspaceAnalyzer, @uri : String, @source : String)
         @diagnostics = [] of LSP::Diagnostic
         @lines = @source.split('\n')
+        @local_methods = Hash(String, Int32).new
+        collect_local_methods
+      end
+
+      private def collect_local_methods
+        begin
+          parser = ::Crystal::Parser.new(@source)
+          parser.filename = @uri
+          ast = parser.parse
+          ast.accept(MethodCollector.new(@local_methods))
+        rescue
+        end
       end
 
       def visit(node : Crystal::ASTNode)
@@ -2147,10 +2238,37 @@ module Liger
       private def check_call_arguments(node : Crystal::Call, location : Crystal::Location)
         method_name = node.name
         args = node.args
+        obj = node.obj
+
+        return if obj
+
+        if expected_param_count = @local_methods[method_name]?
+          actual_arg_count = args.size
+
+          if actual_arg_count != expected_param_count
+            line = location.line_number - 1
+            column = location.column_number - 1
+            
+            end_column = column + method_name.size
+
+            range = LSP::Range.new(
+              LSP::Position.new(line, column),
+              LSP::Position.new(line, end_column)
+            )
+
+            message = "Wrong number of arguments for '#{method_name}' (given #{actual_arg_count}, expected #{expected_param_count})"
+            @diagnostics << LSP::Diagnostic.new(
+              range,
+              message,
+              LSP::DiagnosticSeverity::Error,
+              "liger"
+            )
+            return
+          end
+        end
 
         return if args.empty?
 
-        obj = node.obj
         receiver_type = infer_receiver_type(obj, location)
 
         method_symbol = find_method_symbol(method_name, receiver_type)
@@ -2309,6 +2427,19 @@ module Liger
         end
 
         ""
+      end
+    end
+
+    class MethodCollector < Crystal::Visitor
+      def initialize(@methods : Hash(String, Int32))
+      end
+
+      def visit(node : Crystal::ASTNode)
+        if node.is_a?(Crystal::Def)
+          param_count = node.args.size
+          @methods[node.name] = param_count
+        end
+        true
       end
     end
   end
