@@ -235,7 +235,10 @@ module LSP
     property? is_incomplete : Bool
     property items : Array(CompletionItem)
 
-    def initialize(@items : Array(CompletionItem), @is_incomplete : Bool = false)
+    def initialize(
+      @items : Array(CompletionItem),
+      @is_incomplete : Bool = false,
+    )
     end
   end
 
