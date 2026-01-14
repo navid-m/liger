@@ -1327,11 +1327,14 @@ module Liger
       when "TextDocumentManager", "SemanticAnalyzer", "WorkspaceAnalyzer", "CrystalParser"
         completions = ["new"]
       when "String"
-        completions = ["size", "empty?", "upcase", "downcase", "strip", "split", "starts_with?", "ends_with?", "includes?", "chars", "gsub", "match", "to_i", "to_f", "reverse", "capitalize", "chomp", "lstrip", "rstrip"]
+        completions = ["size", "empty?", "upcase", "downcase", "strip", "split", "starts_with?", "ends_with?",
+                       "includes?", "chars", "gsub", "match", "to_i", "to_f", "reverse", "capitalize", "chomp", "lstrip", "rstrip"]
       when "Array"
-        completions = ["each", "map", "select", "reject", "first", "last", "push", "pop", "sort", "size", "empty?", "join", "reverse", "uniq", "flatten", "compact", "insert", "delete", "clear"]
+        completions = ["each", "map", "select", "reject", "first", "last", "push", "pop", "sort", "size", "empty?",
+                       "join", "reverse", "uniq", "flatten", "compact", "insert", "delete", "clear"]
       when "Hash"
-        completions = ["each", "keys", "values", "has_key?", "size", "empty?", "merge", "delete", "clear", "fetch", "dig", "transform_keys", "transform_values"]
+        completions = ["each", "keys", "values", "has_key?", "size", "empty?", "merge", "delete", "clear",
+                       "fetch", "dig", "transform_keys", "transform_values"]
       when "Int32", "Int64"
         completions = ["to_s", "to_f", "abs", "even?", "odd?", "succ", "pred", "times", "upto", "downto", "step"]
       when "Float64", "Float32"
@@ -1378,7 +1381,8 @@ module Liger
       scan_workspace_if_needed
       @symbol_cache.each_value do |symbols|
         symbols.each do |symbol|
-          if (symbol.kind == "property" || symbol.kind == "getter" || symbol.kind == "setter" || symbol.kind == "instance_variable") && symbol.name == property_name
+          if (symbol.kind == "property" || symbol.kind == "getter" || symbol.kind == "setter" ||
+             symbol.kind == "instance_variable") && symbol.name == property_name
             return symbol
           end
         end
