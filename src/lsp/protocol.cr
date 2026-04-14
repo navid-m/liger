@@ -134,6 +134,32 @@ module LSP
     end
   end
 
+  # Document formatting params
+  struct DocumentFormattingParams
+    include JSON::Serializable
+
+    @[JSON::Field(key: "textDocument")]
+    property text_document : TextDocumentIdentifier
+    property? options : FormattingOptions?
+
+    def initialize(@text_document : TextDocumentIdentifier)
+    end
+  end
+
+  # Formatting options
+  struct FormattingOptions
+    include JSON::Serializable
+
+    property? tab_size : Int32?
+    property? insert_spaces : Bool?
+    property? trim_trailing_whitespace : Bool?
+    property? insert_final_newline : Bool?
+    property? trim_final_newlines : Bool?
+
+    def initialize
+    end
+  end
+
   # Text document edit
   struct TextDocumentEdit
     include JSON::Serializable
