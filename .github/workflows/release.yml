@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Crystal
+        env:
+          HOMEBREW_NO_INSTALL_UPGRADE: 1
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+        run: brew update && brew install crystal || true
+
+      - name: Build the binary
+        run: make arm64-apple-darwin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: liger_arm64-apple-darwin
+          path: build/liger_arm64-apple-darwin.gz
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+
+      - name: Build the binary
+        run: make x86_64-pc-windows-msvc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: liger_x86_64-pc-windows-msvc
+          path: build/liger_x86_64-pc-windows-msvc.gz
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build the static binary
+        run: docker build -t liger .
+
+      - name: Copy binary to host
+        run: |
+          docker run -v $PWD:/app/host --rm liger:latest cp ./build/liger_x86_64-unknown-linux-musl.gz ./host/liger_x86_64-unknown-linux-musl.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: liger_x86_64-unknown-linux-musl
+          path: ./liger_x86_64-unknown-linux-musl.gz
+
+  release:
+    name: Create Release
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/liger_arm64-apple-darwin/liger_arm64-apple-darwin.gz
+            artifacts/liger_x86_64-pc-windows-msvc/liger_x86_64-pc-windows-msvc.gz
+            artifacts/liger_x86_64-unknown-linux-musl/liger_x86_64-unknown-linux-musl.gz
+          generate_release_notes: true
