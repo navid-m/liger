@@ -120,16 +120,14 @@ module LSP
 
     def listen
       loop do
-        begin
-          message = read_message
-          process_message(message) if message
-        rescue IO::EOFError
-          STDERR.puts "Input stream closed, exiting server"
-          break
-        rescue ex : Exception
-          STDERR.puts "Error processing message: #{ex.message}"
-          STDERR.puts ex.backtrace.join("\n")
-        end
+        message = read_message
+        process_message(message) if message
+      rescue IO::EOFError
+        STDERR.puts "Input stream closed, exiting server"
+        break
+      rescue ex : Exception
+        STDERR.puts "Error processing message: #{ex.message}"
+        STDERR.puts ex.backtrace.join("\n")
       end
       exit 0
     end

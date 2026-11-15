@@ -330,7 +330,6 @@ module Liger
           content = "```crystal\n#{output.strip}\n```"
           return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
         end
-        # ameba:disable Lint/UnusedRescueVariable
       rescue ex
         {% if flag?(:debug) %}
           STDERR.puts "Error getting hover info: #{ex.message}"
@@ -2083,12 +2082,10 @@ module Liger
       items : Array(LSP::CompletionItem),
       source : String,
     )
-      begin
-        parser = Crystal::Parser.new(source)
-        node = parser.parse
-        extract_symbols_for_completion(node, items)
-      rescue
-      end
+      parser = Crystal::Parser.new(source)
+      node = parser.parse
+      extract_symbols_for_completion(node, items)
+    rescue
     end
 
     private def extract_symbols_for_completion(
