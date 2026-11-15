@@ -76,6 +76,7 @@ module LSP
     @output : IO
     @handlers = Hash(String, Proc(JSON::Any?, JSON::Any)).new
     @notifications = Hash(String, Proc(JSON::Any?, Nil)).new
+    @write_mutex = Mutex.new
 
     def initialize(@input : IO, @output : IO)
     end
@@ -114,8 +115,10 @@ module LSP
     private def send_message(message : Message)
       json = message.to_json
       content = "Content-Length: #{json.bytesize}\r\n\r\n#{json}"
-      @output.print(content)
-      @output.flush
+      @write_mutex.synchronize do
+        @output.print(content)
+        @output.flush
+      end
     end
 
     def listen

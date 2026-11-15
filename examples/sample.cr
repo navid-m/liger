@@ -89,3 +89,9 @@ puts color.to_hex
 
 puts SampleModule::Utilities.format_number(1234567)
 puts SampleModule::Utilities.random_string(16)
+
+def some_thing(h : Int32)
+  puts "hi"
+end
+
+some_thing("hello")

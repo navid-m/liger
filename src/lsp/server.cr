@@ -14,6 +14,7 @@ module LSP
     @initialized = false
     @workspace_root : String?
     @shutdown_requested = false
+    @diagnostic_generations = Hash(String, Int32).new(0)
 
     # Initialize the server
     def initialize(input : IO = STDIN, output : IO = STDOUT)
@@ -24,9 +25,9 @@ module LSP
       setup_handlers
     end
 
-    # Enable strict type checking mode
-    def enable_strict_mode
-      @semantic_analyzer.enable_strict_type_checking = true
+    # Disable type checking, leaving syntax diagnostics only
+    def enable_lax_mode
+      @semantic_analyzer.lax = true
     end
 
     # Run the server
@@ -66,9 +67,9 @@ module LSP
         @semantic_analyzer.workspace_root = root_uri
 
         if init_options = params["initializationOptions"]?
-          if strict_checking = init_options["strictTypeChecking"]?
-            @semantic_analyzer.enable_strict_type_checking = strict_checking.as_bool? || false
-            STDERR.puts "Strict type checking: #{@semantic_analyzer.enable_strict_type_checking?}"
+          if lax_checking = init_options["laxTypeChecking"]?
+            @semantic_analyzer.lax = lax_checking.as_bool? || false
+            STDERR.puts "Lax type checking: #{@semantic_analyzer.lax?}"
           end
         end
       end
@@ -132,7 +133,7 @@ module LSP
       @document_manager.open(doc.uri, doc.language_id, doc.version, doc.text)
       @semantic_analyzer.update_source(doc.uri, doc.text)
 
-      send_diagnostics(doc.uri)
+      schedule_diagnostics(doc.uri, Time::Span.zero)
     end
 
     # Handle a didChange notification
@@ -148,7 +149,7 @@ module LSP
         @semantic_analyzer.update_source(doc.uri, text_doc.text)
       end
 
-      send_diagnostics(doc.uri)
+      schedule_diagnostics(doc.uri)
     end
 
     # Handle a didClose notification
@@ -158,6 +159,7 @@ module LSP
       did_close = DidCloseTextDocumentParams.from_json(params.to_json)
       @document_manager.close(did_close.text_document.uri)
       @semantic_analyzer.remove_source(did_close.text_document.uri)
+      @diagnostic_generations[did_close.text_document.uri] += 1
     end
 
     # Handle a didSave notification
@@ -165,7 +167,7 @@ module LSP
       return unless params
 
       did_save = DidSaveTextDocumentParams.from_json(params.to_json)
-      send_diagnostics(did_save.text_document.uri)
+      schedule_diagnostics(did_save.text_document.uri, Time::Span.zero)
     end
 
     # Completion request
@@ -369,11 +371,24 @@ module LSP
     end
 
     # Send diagnostics for a document
-    private def send_diagnostics(uri : DocumentUri)
+    private def schedule_diagnostics(uri : DocumentUri, delay : Time::Span = 300.milliseconds)
+      generation = @diagnostic_generations[uri] += 1
+
+      spawn do
+        sleep delay if delay > Time::Span.zero
+        send_diagnostics(uri, generation)
+      end
+    end
+
+    private def send_diagnostics(uri : DocumentUri, generation : Int32)
+      return unless @diagnostic_generations[uri]? == generation
+
       doc = @document_manager.get(uri)
       return unless doc
 
       diagnostics = @semantic_analyzer.analyze(uri)
+      return unless @diagnostic_generations[uri]? == generation
+
       publish_params = PublishDiagnosticsParams.new(uri, diagnostics)
       @rpc.send_notification("textDocument/publishDiagnostics", JSON.parse(publish_params.to_json))
     end

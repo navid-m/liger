@@ -1,5 +1,6 @@
 require "../lsp/protocol"
 require "./workspace_analyzer"
+require "./type_checker"
 require "compiler/crystal/syntax"
 require "uri"
 require "yaml"
@@ -9,7 +10,7 @@ module Liger
     property workspace_root : String?
     property? enable_semantic_hover : Bool = true
     property? enable_type_aware_completion : Bool = true
-    property? enable_strict_type_checking : Bool = false
+    property? lax : Bool = false
 
     @sources = Hash(String, String).new
     @source_lines_cache = Hash(String, Array(String)).new
@@ -19,9 +20,11 @@ module Liger
     @main_file_cache : String?
     @main_file_cache_time : Time?
     @workspace_analyzer : WorkspaceAnalyzer
+    @type_checker : TypeChecker
 
     def initialize(@workspace_root : String? = nil)
       @workspace_analyzer = WorkspaceAnalyzer.new(@workspace_root)
+      @type_checker = TypeChecker.new(@workspace_root)
       if workspace_root = @workspace_root
         workspace_path = uri_to_filename(workspace_root)
         @cache_dir = cache_dir = File.join(workspace_path, ".liger-cache")
@@ -32,6 +35,7 @@ module Liger
     def workspace_root=(root : String?)
       @workspace_root = root
       @workspace_analyzer = WorkspaceAnalyzer.new(root)
+      @type_checker = TypeChecker.new(root)
       if root
         workspace_path = uri_to_filename(root)
         @cache_dir = cache_dir = File.join(workspace_path, ".liger-cache")
@@ -106,9 +110,14 @@ module Liger
         )
       end
 
-      if ast && enable_strict_type_checking?
-        type_check_diagnostics = check_argument_types(ast, uri, source)
-        diagnostics.concat(type_check_diagnostics)
+      if ast && !lax?
+        filename = uri_to_filename(uri)
+        main_file = find_main_file(filename)
+        open_sources = {} of String => String
+        @sources.each do |open_uri, open_source|
+          open_sources[uri_to_filename(open_uri)] = open_source
+        end
+        diagnostics.concat(@type_checker.check(filename, source, main_file, open_sources))
       end
 
       diagnostics
@@ -791,7 +800,7 @@ module Liger
           if targets = yaml["targets"]?
             targets.as_h.each do |name, config|
               if main_path = config["main"]?
-                normalized_main = main_path.as_s.gsub('/', '\\')
+                normalized_main = main_path.as_s.gsub('/', File::SEPARATOR)
                 main_file = File.join(workspace_path, normalized_main)
                 if File.exists?(main_file)
                   result = main_file
@@ -2125,199 +2134,6 @@ module Liger
         end
       when Crystal::Expressions
         node.expressions.each { |expr| extract_symbols_for_completion(expr, items) }
-      end
-    end
-
-    private def check_argument_types(node : Crystal::ASTNode, uri : String, source : String) : Array(LSP::Diagnostic)
-      diagnostics = [] of LSP::Diagnostic
-      visitor = ArgumentTypeChecker.new(self, @workspace_analyzer, uri, source)
-      node.accept(visitor)
-      diagnostics.concat(visitor.diagnostics)
-      diagnostics
-    end
-
-    class ArgumentTypeChecker < Crystal::Visitor
-      getter diagnostics : Array(LSP::Diagnostic)
-
-      def initialize(@analyzer : SemanticAnalyzer, @workspace_analyzer : WorkspaceAnalyzer, @uri : String, @source : String)
-        @diagnostics = [] of LSP::Diagnostic
-        @lines = @source.split('\n')
-      end
-
-      def visit(node : Crystal::ASTNode)
-        if node.is_a?(Crystal::Call)
-          if location = node.location
-            check_call_arguments(node, location)
-          end
-        end
-        true
-      end
-
-      private def check_call_arguments(node : Crystal::Call, location : Crystal::Location)
-        method_name = node.name
-        args = node.args
-
-        return if args.empty?
-
-        obj = node.obj
-        receiver_type = infer_receiver_type(obj, location)
-
-        method_symbol = find_method_symbol(method_name, receiver_type)
-        return unless method_symbol
-
-        param_types = extract_parameter_types(method_symbol.signature)
-        return if param_types.empty?
-
-        args.each_with_index do |arg, idx|
-          next if idx >= param_types.size
-
-          expected_type = param_types[idx]
-          actual_type = infer_argument_type(arg)
-
-          next unless actual_type
-          next if types_compatible?(expected_type, actual_type)
-
-          if arg_location = arg.location
-            line = arg_location.line_number - 1
-            column = arg_location.column_number - 1
-
-            arg_text = get_node_text(arg)
-            end_column = column + arg_text.size
-
-            range = LSP::Range.new(
-              LSP::Position.new(line, column),
-              LSP::Position.new(line, end_column)
-            )
-
-            message = "Type mismatch: expected #{expected_type}, got #{actual_type}"
-            @diagnostics << LSP::Diagnostic.new(
-              range,
-              message,
-              LSP::DiagnosticSeverity::Error,
-              "liger"
-            )
-          end
-        end
-      end
-
-      private def infer_receiver_type(obj : Crystal::ASTNode?, location : Crystal::Location) : String?
-        return unless obj
-
-        if obj.is_a?(Crystal::Var)
-          return obj.name.capitalize
-        elsif obj.is_a?(Crystal::Path)
-          return obj.names.join("::")
-        elsif obj.is_a?(Crystal::InstanceVar)
-          return
-        end
-
-        nil
-      end
-
-      private def find_method_symbol(method_name : String, receiver_type : String?) : WorkspaceAnalyzer::SymbolInfo?
-        if receiver_type
-          qualified_name = "#{receiver_type}::#{method_name}"
-          if symbol = @workspace_analyzer.find_symbol_info(qualified_name)
-            return symbol if symbol.kind == "method" || symbol.kind == "fun"
-          end
-        end
-
-        if symbol = @workspace_analyzer.find_symbol_info(method_name)
-          return symbol if symbol.kind == "method" || symbol.kind == "fun"
-        end
-
-        nil
-      end
-
-      private def extract_parameter_types(signature : String?) : Array(String)
-        return [] of String unless signature
-
-        params = [] of String
-
-        if match = signature.match(/\(([^)]+)\)/)
-          param_list = match[1]
-          param_list.split(',').each do |param|
-            param = param.strip
-            if type_match = param.match(/:\s*(\w+)/)
-              params << type_match[1]
-            end
-          end
-        end
-
-        params
-      end
-
-      private def infer_argument_type(arg : Crystal::ASTNode) : String?
-        case arg
-        when Crystal::NumberLiteral
-          case arg.kind
-          when .i8?, .i16?, .i32?
-            "Int32"
-          when .i64?
-            "Int64"
-          when .u8?, .u16?, .u32?
-            "UInt32"
-          when .u64?
-            "UInt64"
-          when .f32?
-            "Float32"
-          when .f64?
-            "Float64"
-          else
-            "Int32"
-          end
-        when Crystal::StringLiteral
-          "String"
-        when Crystal::BoolLiteral
-          "Bool"
-        when Crystal::CharLiteral
-          "Char"
-        when Crystal::ArrayLiteral
-          "Array"
-        when Crystal::HashLiteral
-          "Hash"
-        when Crystal::NilLiteral
-          "Nil"
-        when Crystal::Var
-          nil
-        when Crystal::Call
-          nil
-        else
-          nil
-        end
-      end
-
-      private def types_compatible?(expected : String, actual : String) : Bool
-        return true if expected == actual
-
-        return true if expected == "Number" && ["Int32", "Int64", "Float32", "Float64", "UInt32", "UInt64"].includes?(actual)
-
-        return true if expected == "Int" && ["Int32", "Int64"].includes?(actual)
-
-        return true if expected == "Float" && ["Float32", "Float64"].includes?(actual)
-
-        false
-      end
-
-      private def get_node_text(node : Crystal::ASTNode) : String
-        if location = node.location
-          line_idx = location.line_number - 1
-          return "" if line_idx >= @lines.size
-
-          line = @lines[line_idx]
-          column = location.column_number - 1
-
-          return "" if column >= line.size
-
-          end_pos = column
-          while end_pos < line.size && !line[end_pos].whitespace? && line[end_pos] != ',' && line[end_pos] != ')'
-            end_pos += 1
-          end
-
-          return line[column...end_pos]
-        end
-
-        ""
       end
     end
   end
