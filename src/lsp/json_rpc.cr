@@ -123,7 +123,7 @@ module LSP
         begin
           message = read_message
           process_message(message) if message
-        rescue ex : IO::EOFError
+        rescue IO::EOFError
           STDERR.puts "Input stream closed, exiting server"
           break
         rescue ex : Exception

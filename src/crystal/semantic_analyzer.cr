@@ -330,6 +330,7 @@ module Liger
           content = "```crystal\n#{output.strip}\n```"
           return LSP::Hover.new(LSP::MarkupContent.new("markdown", content))
         end
+        # ameba:disable Lint/UnusedRescueVariable
       rescue ex
         {% if flag?(:debug) %}
           STDERR.puts "Error getting hover info: #{ex.message}"
